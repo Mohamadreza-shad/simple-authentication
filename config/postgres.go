@@ -5,7 +5,7 @@ type Postgres struct {
 }
 
 func GetPostgresURL() string {
-	if cfg.Postgres.URL == "" && GetEnv() == EnvTest {
+	if cfg.Postgres.URL == "" {
 		return "postgres://postgres:postgres@localhost:5432/auth_db"
 	}
 	return cfg.Postgres.URL

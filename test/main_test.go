@@ -12,8 +12,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var serviceName = "test-accountant"
-
 var mainDb *pgxpool.Pool
 var redisClient redis.UniversalClient
 var loggerService *logger.Logger
@@ -62,6 +60,14 @@ func getRedis() redis.UniversalClient {
 
 func truncateDB() error {
 	ctx := context.Background()
-	_, err := getDB().Exec(ctx, "TRUNCATE TABLE users CASCADE")
-	return err
+	db := getDB()
+	_, err := db.Exec(ctx, "TRUNCATE TABLE users CASCADE")
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(ctx, "ALTER SEQUENCE users_id_seq RESTART WITH 1")
+	if err != nil {
+		return err
+	}
+	return nil
 }

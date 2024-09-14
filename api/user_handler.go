@@ -16,7 +16,7 @@ type UserHandler struct {
 
 func (h *UserHandler) SignUp(c *gin.Context) {
 	params := user.SignUpParams{}
-	err := c.BindJSON(params)
+	err := c.BindJSON(&params)
 	if err != nil {
 		MakeErrorResponseWithCode(
 			c.Writer,

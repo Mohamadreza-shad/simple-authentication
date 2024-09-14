@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -68,7 +69,7 @@ func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpRespon
 			Username:     params.Username,
 			Password:     string(hashedPassword),
 			NationalCode: params.NationalCode,
-			Phone:        "+98" + params.Phone[1:],
+			Phone:        params.Phone,
 		})
 	if err != nil {
 		return SignUpResponse{}, ErrSomethingWentWrong
@@ -97,14 +98,14 @@ func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpRespon
 func generateAccessToken(userId string) (string, error) {
 	claims := jwtLib.RegisteredClaims{
 		Issuer:    TOKENISSUER,
-		Subject:   userId,
+		Subject:   fmt.Sprintf("userId:%s",userId),
 		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
 		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(ACCESSTOKENEXPIREDIN * time.Minute)},
 	}
-	accessToken := jwtLib.NewWithClaims(jwtLib.SigningMethodES256, claims)
-	signedAccessToken, err := accessToken.SignedString(config.SecretKey())
+	accessToken := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, claims)
+	signedAccessToken, err := accessToken.SignedString([]byte(config.SecretKey()))
 	if err != nil {
-		return "", ErrSomethingWentWrong
+		return "", err
 	}
 	return signedAccessToken, nil
 }
@@ -112,12 +113,12 @@ func generateAccessToken(userId string) (string, error) {
 func generateRefreshToken(userId string) (string, error) {
 	claims := jwtLib.RegisteredClaims{
 		Issuer:    TOKENISSUER,
-		Subject:   userId,
+		Subject:   fmt.Sprintf("userId:%s",userId),
 		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
 		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(REFRESHTOKENEXPIREDIN * 24 * time.Hour)},
 	}
-	refreshToken := jwtLib.NewWithClaims(jwtLib.SigningMethodES256, claims)
-	signedRefreshToken, err := refreshToken.SignedString(config.SecretKey())
+	refreshToken := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, claims)
+	signedRefreshToken, err := refreshToken.SignedString([]byte(config.SecretKey()))
 	if err != nil {
 		return "", ErrSomethingWentWrong
 	}

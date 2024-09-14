@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -35,6 +36,14 @@ func SetEnv(env string) {
 	cfg.Env = env
 }
 
+func isTestEnv() bool {
+	return flag.Lookup("test.v") != nil
+}
+
+func setTestEnvVariable() {
+	cfg.Env = EnvTest
+}
+
 func Load() error {
 	config, err := config.NewConfig(config.WithSource(env.NewSource()))
 	if err != nil {
@@ -47,6 +56,9 @@ func Load() error {
 	err = config.Scan(cfg)
 	if err != nil {
 		return errors.Wrap(err, "config.Scan")
+	}
+	if isTestEnv() {
+		setTestEnvVariable()
 	}
 	return nil
 }

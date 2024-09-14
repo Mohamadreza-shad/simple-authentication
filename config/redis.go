@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 type RedisMasterName struct {
 	Name string
 }
@@ -10,7 +12,8 @@ type Redis struct {
 }
 
 func GetRedisURI() string {
-	if cfg.Redis.URI == "" && GetEnv() == EnvTest {
+	fmt.Println(GetEnv())
+	if cfg.Redis.URI == "" {
 		return "redis://:123456@localhost:6379"
 	}
 	return cfg.Redis.URI
