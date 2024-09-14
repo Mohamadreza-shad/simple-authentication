@@ -47,6 +47,11 @@ type SignUpResponse struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+type SignInParams struct {
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
 func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpResponse, error) {
 	_, err := s.repo.UserByName(ctx, s.db, params.Username)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -93,6 +98,16 @@ func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpRespon
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
+}
+
+func (s *Service) SignIn(ctx context.Context, username, password string) (SignUpResponse, error) {
+	//find user by username
+	//check if credentials are correct
+	//generate access token
+	//generate refresh token
+	//save refresh token in redis
+	//return access token and refresh token
+	return SignUpResponse{}, nil
 }
 
 func generateAccessToken(userId string) (string, error) {
