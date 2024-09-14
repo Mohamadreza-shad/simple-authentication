@@ -8,11 +8,11 @@ import (
 
 	"github.com/Mohamadreza-shad/simple-authentication/client"
 	"github.com/Mohamadreza-shad/simple-authentication/config"
+	"github.com/Mohamadreza-shad/simple-authentication/logger"
 	"github.com/Mohamadreza-shad/simple-authentication/repository"
 	jwtLib "github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
-	"go-micro.dev/v4/logger"
 	"golang.org/x/crypto/bcrypt"
 )
 
