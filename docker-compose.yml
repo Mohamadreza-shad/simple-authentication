@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  db:
+    image: "postgres"
+    environment:
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=auth_db
+    volumes:
+      - auth-db:/var/lib/postgresql/data
+    restart: always
+    ports: 
+      - 5432:5432
+
+  redis-master:
+    image: 'bitnami/redis:latest'
+    ports:
+      - '6379:6379'
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_PASSWORD=123456
+    volumes:
+      - 'redis-persistence:/bitnami'
+
+  redis-replica:
+    image: 'bitnami/redis:latest'
+    ports:
+      - '6379'
+    depends_on:
+      - redis-master
+    environment:
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT_NUMBER=6379
+      - REDIS_MASTER_PASSWORD=123456
+      - REDIS_PASSWORD=123456
+
+  liquibase:
+    image: liquibase/liquibase
+    command: tail -f /liquibase/changelog.xml
+    volumes:
+      - ./database/changelog.xml:/liquibase/changelog.xml
+      - ./database/migrations:/liquibase/migrations
+
+volumes:
+    auth-db:
+    redis-persistence:
+       driver: local
+
+
