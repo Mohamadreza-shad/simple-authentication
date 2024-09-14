@@ -35,7 +35,7 @@ func SetEnv(env string) {
 	cfg.Env = env
 }
 
-func (c *Config) Load() error {
+func Load() error {
 	config, err := config.NewConfig(config.WithSource(env.NewSource()))
 	if err != nil {
 		return errors.Wrap(err, "config.New")
