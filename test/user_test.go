@@ -26,7 +26,7 @@ type UserbyIdResponseSuccess struct {
 	Data    user.User `json:"data,omitempty"`
 }
 
-type UpdateUserProfileResponseSuccess struct {
+type UpdateUserResponseSuccess struct {
 	Success bool   `json:"success" example:"true"`
 	Message string `json:"message,omitempty"`
 }
@@ -484,7 +484,7 @@ func Test_UpdateUserProfile_Successful(t *testing.T) {
 
 	respInByte, err = io.ReadAll(resp.Body)
 	assert.Nil(err)
-	userByIdResponse := UpdateUserProfileResponseSuccess{}
+	userByIdResponse := UpdateUserResponseSuccess{}
 	err = json.Unmarshal(respInByte, &userByIdResponse)
 	assert.Nil(err)
 
@@ -498,4 +498,264 @@ func Test_UpdateUserProfile_Successful(t *testing.T) {
 	assert.Equal(fetchedUser.Email.String, params.Email)
 	assert.Equal(fetchedUser.NationalCode.String, params.NationalCode)
 	assert.Equal(fetchedUser.Phone.String, params.Phone)
+}
+
+func Test_UpdateUsername_InvalidInput(t *testing.T){
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	authService := auth.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signup", authHandler.SignUp)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(auth.SignUpParams{
+		Username:     "test-user",
+		Password:     "p@ssW0rd",
+	})
+	assert.Nil(err)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signup", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	signUpResponse := ResponseSuccess{}
+	err = json.Unmarshal(respInByte, &signUpResponse)
+	assert.Nil(err)
+
+	accessTokenFromServer := signUpResponse.Data.AccessToken
+
+	v1 := r.Group("/api/v1")
+	v1.Use(middleware.AuthMiddleware(authService))
+	v1.PUT("/user/update-username", userHandler.UpdateUsername)
+
+	params := user.UpdateUsernameParams{
+		Username: "",
+	}
+	paramsInJson, err = json.Marshal(params)
+	assert.Nil(err)
+
+	req, err = http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("%s/api/v1/user/update-username", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Authorization", accessTokenFromServer)
+
+	// Act
+	resp, err = http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err = io.ReadAll(resp.Body)
+	assert.Nil(err)
+	userByIdResponse := api.ResponseFailure{}
+	err = json.Unmarshal(respInByte, &userByIdResponse)
+	assert.Nil(err)
+
+	//Assert
+	assert.False(userByIdResponse.Success)
+	assert.Equal(userByIdResponse.Error.Code, http.StatusBadRequest)
+	assert.Equal(userByIdResponse.Error.Message, user.ErrUsernameCannotBeEmpty.Error())
+}
+
+func Test_UpdateUsername_UsernameIsAlreadyTaken(t *testing.T){
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	authService := auth.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signup", authHandler.SignUp)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(auth.SignUpParams{
+		Username:     "test-user",
+		Password:     "p@ssW0rd",
+	})
+	assert.Nil(err)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signup", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	signUpResponse := ResponseSuccess{}
+	err = json.Unmarshal(respInByte, &signUpResponse)
+	assert.Nil(err)
+
+	accessTokenFromServer := signUpResponse.Data.AccessToken
+
+	v1 := r.Group("/api/v1")
+	v1.Use(middleware.AuthMiddleware(authService))
+	v1.PUT("/user/update-username", userHandler.UpdateUsername)
+
+	params := user.UpdateUsernameParams{
+		Username: "test-user",
+	}
+	paramsInJson, err = json.Marshal(params)
+	assert.Nil(err)
+
+	req, err = http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("%s/api/v1/user/update-username", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Authorization", accessTokenFromServer)
+
+	// Act
+	resp, err = http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err = io.ReadAll(resp.Body)
+	assert.Nil(err)
+	userByIdResponse := api.ResponseFailure{}
+	err = json.Unmarshal(respInByte, &userByIdResponse)
+	assert.Nil(err)
+
+	//Assert
+	assert.False(userByIdResponse.Success)
+	assert.Equal(userByIdResponse.Error.Code, http.StatusForbidden)
+	assert.Equal(userByIdResponse.Error.Message, user.ErrUsernameIsAlreadyTaken.Error())
+}
+
+func Test_UpdateUsername_Successful(t *testing.T){
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	authService := auth.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signup", authHandler.SignUp)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(auth.SignUpParams{
+		Username:     "test-user",
+		Password:     "p@ssW0rd",
+	})
+	assert.Nil(err)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signup", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	signUpResponse := ResponseSuccess{}
+	err = json.Unmarshal(respInByte, &signUpResponse)
+	assert.Nil(err)
+
+	accessTokenFromServer := signUpResponse.Data.AccessToken
+
+	v1 := r.Group("/api/v1")
+	v1.Use(middleware.AuthMiddleware(authService))
+	v1.PUT("/user/update-username", userHandler.UpdateUsername)
+
+	params := user.UpdateUsernameParams{
+		Username: "new-test-user",
+	}
+	paramsInJson, err = json.Marshal(params)
+	assert.Nil(err)
+
+	req, err = http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("%s/api/v1/user/update-username", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Authorization", accessTokenFromServer)
+
+	// Act
+	resp, err = http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err = io.ReadAll(resp.Body)
+	assert.Nil(err)
+	userByIdResponse := UpdateUserResponseSuccess{}
+	err = json.Unmarshal(respInByte, &userByIdResponse)
+	assert.Nil(err)
+
+	//Assert
+	assert.True(userByIdResponse.Success)
+	assert.Equal(userByIdResponse.Message, "username has been updated successfully")
+
+	_,err = repo.UserByName(ctx,db,params.Username)
+	assert.Nil(err)
 }

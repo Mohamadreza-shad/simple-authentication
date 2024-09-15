@@ -44,10 +44,11 @@ func New(
 	r.POST("/api/user/refresh-token", authHandler.RefreshToken)
 	r.POST("/api/user/logout", authHandler.LogOut)
 
-	v1 := r.Group("/api/v1")
-	v1.Use(middleware.AuthMiddleware(authService))
-	v1.GET("/user", userHandler.UserById)
-	v1.PUT("/user/update-profile",userHandler.UpdateUserProfile)
+	securedV1 := r.Group("/api/v1")
+	securedV1.Use(middleware.AuthMiddleware(authService))
+	securedV1.GET("/user", userHandler.UserById)
+	securedV1.PUT("/user/update-profile", userHandler.UpdateUserProfile)
+	securedV1.PUT("/user/update-username", userHandler.UpdateUsername)
 
 	return &Router{
 		Handler: r,

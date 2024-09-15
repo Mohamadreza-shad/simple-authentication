@@ -14,10 +14,12 @@ import (
 )
 
 var (
-	ErrSomethingWentWrong  = errors.New("something went wrong")
-	ErrUserNotFound        = errors.New("user not found")
-	ErrInvalidNationalCode = errors.New("invalid national code")
-	ErrInvalidPhone        = errors.New("invalid Phone")
+	ErrSomethingWentWrong     = errors.New("something went wrong")
+	ErrUserNotFound           = errors.New("user not found")
+	ErrInvalidNationalCode    = errors.New("invalid national code")
+	ErrInvalidPhone           = errors.New("invalid Phone")
+	ErrUsernameIsAlreadyTaken = errors.New("username is already taken")
+	ErrUsernameCannotBeEmpty  = errors.New("username cannot be empty")
 )
 
 type Service struct {
@@ -46,6 +48,11 @@ type UpdateUserProfileParams struct {
 	NationalCode string `json:"nationalCode"`
 	Phone        string `json:"phone"`
 	Email        string `json:"email"`
+}
+
+type UpdateUsernameParams struct {
+	UserId   int64  `json:"-"`
+	Username string `json:"nationalCode" validate:"required"`
 }
 
 func (s *Service) UserById(ctx context.Context, params UserByIdParams) (User, error) {
@@ -87,6 +94,30 @@ func (s *Service) UpdateUserProfile(ctx context.Context, params UpdateUserProfil
 		Phone:        pgtype.Text{String: params.Phone, Valid: true},
 		Email:        pgtype.Text{String: params.Email, Valid: true},
 	})
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	return nil
+}
+
+func (s *Service) UpdateUsername(ctx context.Context, params UpdateUsernameParams) error {
+	if strings.EqualFold(params.Username, "") {
+		return ErrUsernameCannotBeEmpty
+	}
+	_, err := s.repo.UserByName(ctx, s.db, params.Username)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return ErrSomethingWentWrong
+	}
+	if err == nil {
+		return ErrUsernameIsAlreadyTaken
+	}
+	err = s.repo.UpdateUsername(
+		ctx,
+		s.db,
+		repository.UpdateUsernameParams{
+			ID:       params.UserId,
+			Username: params.Username,
+		})
 	if err != nil {
 		return ErrSomethingWentWrong
 	}

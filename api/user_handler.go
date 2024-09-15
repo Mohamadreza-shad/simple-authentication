@@ -88,6 +88,46 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, nil, "user profile updated successfully")
 }
 
+func (h *UserHandler) UpdateUsername(c *gin.Context) {
+	userId, isExist := readUserIDFromContext(c)
+	if !isExist {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusUnauthorized,
+			"Invalid or expired token")
+		return
+	}
+	params := user.UpdateUsernameParams{}
+	err := c.BindJSON(&params)
+	if err != nil {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusUnauthorized,
+			"Invalid request")
+		return
+	}
+	params.UserId = userId
+	err = h.userService.UpdateUsername(c.Request.Context(), params)
+	if err != nil && errors.Is(err,user.ErrUsernameCannotBeEmpty){
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusBadRequest,
+			user.ErrUsernameCannotBeEmpty.Error())
+		return
+	}
+	if err != nil && errors.Is(err,user.ErrUsernameIsAlreadyTaken){
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusForbidden,
+			user.ErrUsernameIsAlreadyTaken.Error())
+		return
+	}
+	if err != nil {
+		MakeErrorResponseWithoutCode(c.Writer, err)
+		return
+	}
+	MakeSuccessResponse(c.Writer, nil, "username has been updated successfully")
+}
 func NewUserHandler(
 	userService *user.Service,
 	validator *validator.Validate,

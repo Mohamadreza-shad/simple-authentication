@@ -20,3 +20,9 @@ SET
     phone = coalesce(sqlc.narg('phone'), phone),
     email = coalesce(sqlc.narg('email'), email)
 WHERE id = $1;
+
+-- name: UpdateUsername :exec
+UPDATE users
+SET 
+    username = $2
+WHERE id = $1;

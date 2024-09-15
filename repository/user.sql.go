@@ -69,6 +69,23 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, db DBTX, arg UpdateUser
 	return err
 }
 
+const updateUsername = `-- name: UpdateUsername :exec
+UPDATE users
+SET 
+    username = $2
+WHERE id = $1
+`
+
+type UpdateUsernameParams struct {
+	ID       int64
+	Username string
+}
+
+func (q *Queries) UpdateUsername(ctx context.Context, db DBTX, arg UpdateUsernameParams) error {
+	_, err := db.Exec(ctx, updateUsername, arg.ID, arg.Username)
+	return err
+}
+
 const userByID = `-- name: UserByID :one
 SELECT id, username, password, national_code, phone, email, is_active, created_at, updated_at FROM users Where id = $1
 `
