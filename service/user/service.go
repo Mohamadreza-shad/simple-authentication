@@ -52,7 +52,7 @@ type UpdateUserProfileParams struct {
 
 type UpdateUsernameParams struct {
 	UserId   int64  `json:"-"`
-	Username string `json:"nationalCode" validate:"required"`
+	Username string `json:"username" validate:"required"`
 }
 
 func (s *Service) UserById(ctx context.Context, params UserByIdParams) (User, error) {
