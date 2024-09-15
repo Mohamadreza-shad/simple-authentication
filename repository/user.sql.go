@@ -7,6 +7,8 @@ package repository
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const signUp = `-- name: SignUp :one
@@ -48,6 +50,32 @@ func (q *Queries) SignUp(ctx context.Context, db DBTX, arg SignUpParams) (User, 
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :exec
+UPDATE users
+SET 
+    national_code = coalesce($2, national_code),
+    phone = coalesce($3, phone),
+    email = coalesce($4, email)
+WHERE id = $1
+`
+
+type UpdateUserProfileParams struct {
+	ID           int64
+	NationalCode pgtype.Text
+	Phone        pgtype.Text
+	Email        pgtype.Text
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, db DBTX, arg UpdateUserProfileParams) error {
+	_, err := db.Exec(ctx, updateUserProfile,
+		arg.ID,
+		arg.NationalCode,
+		arg.Phone,
+		arg.Email,
+	)
+	return err
 }
 
 const userByID = `-- name: UserByID :one

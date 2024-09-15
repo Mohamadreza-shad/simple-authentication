@@ -47,6 +47,7 @@ func New(
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.AuthMiddleware(authService))
 	v1.GET("/user", userHandler.UserById)
+	v1.PUT("/user/update-profile",userHandler.UpdateUserProfile)
 
 	return &Router{
 		Handler: r,

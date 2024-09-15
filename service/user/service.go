@@ -8,6 +8,7 @@ import (
 	"github.com/Mohamadreza-shad/simple-authentication/logger"
 	"github.com/Mohamadreza-shad/simple-authentication/repository"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -37,6 +38,13 @@ type User struct {
 	UpdatedAt    int64  `json:"updatedAt"`
 }
 
+type UpdateUserProfileParams struct {
+	UserId       int64  `json:"-"`
+	NationalCode string `json:"nationalCode"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+}
+
 func (s *Service) UserById(ctx context.Context, params UserByIdParams) (User, error) {
 	fetchedUser, err := s.repo.UserByID(ctx, s.db, params.Id)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -54,6 +62,26 @@ func (s *Service) UserById(ctx context.Context, params UserByIdParams) (User, er
 		CreatedAt:    fetchedUser.CreatedAt.Time.Unix(),
 		UpdatedAt:    fetchedUser.CreatedAt.Time.Unix(),
 	}, nil
+}
+
+func (s *Service) UpdateUserProfile(ctx context.Context, params UpdateUserProfileParams) error {
+	_, err := s.repo.UserByID(ctx, s.db, params.UserId)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return ErrSomethingWentWrong
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrUserNotFound
+	}
+	err = s.repo.UpdateUserProfile(ctx, s.db, repository.UpdateUserProfileParams{
+		ID:           params.UserId,
+		NationalCode: pgtype.Text{String: params.NationalCode, Valid: true},
+		Phone:        pgtype.Text{String: params.Phone, Valid: true},
+		Email:        pgtype.Text{String: params.Email, Valid: true},
+	})
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	return nil
 }
 
 func New(

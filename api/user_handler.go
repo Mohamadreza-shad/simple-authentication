@@ -20,7 +20,7 @@ func (h *UserHandler) UserById(c *gin.Context) {
 		MakeErrorResponseWithCode(
 			c.Writer,
 			http.StatusUnauthorized,
-			"Invalid user profile")
+			"Invalid or expired token")
 		return
 	}
 	fetchedUser, err := h.userService.UserById(
@@ -38,6 +38,40 @@ func (h *UserHandler) UserById(c *gin.Context) {
 		return
 	}
 	MakeSuccessResponse(c.Writer, fetchedUser, "user fetched successfully")
+}
+
+func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
+	userId, isExist := readUserIDFromContext(c)
+	if !isExist {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusUnauthorized,
+			"Invalid or expired token")
+		return
+	}
+	params := user.UpdateUserProfileParams{}
+	err := c.BindJSON(&params)
+	if err != nil {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusUnauthorized,
+			"Invalid request")
+		return
+	}
+	params.UserId = userId
+	err = h.userService.UpdateUserProfile(c.Request.Context(), params)
+	if err != nil && errors.Is(err, user.ErrUserNotFound) {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusNotFound,
+			"user not found")
+		return
+	}
+	if err != nil {
+		MakeErrorResponseWithoutCode(c.Writer, err)
+		return
+	}
+	MakeSuccessResponse(c.Writer, nil, "user profile updated successfully")
 }
 
 func NewUserHandler(
