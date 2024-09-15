@@ -913,5 +913,3 @@ func Test_User_LogOut_Successful(t *testing.T) {
 	assert.Nil(err)
 	assert.True(blackListedAccessKey)
 }
-
-

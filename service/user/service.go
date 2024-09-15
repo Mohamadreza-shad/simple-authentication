@@ -245,7 +245,7 @@ func IsRefreshTokenValid(ctx context.Context, signedToken string) error {
 	return nil
 }
 
-func (s *Service) IsAccessTokenValid(ctx context.Context, signedToken string) error {
+func (s *Service) IsAccessTokenValid(ctx context.Context, signedToken string) (*jwtLib.Token, error) {
 	keyFunc := func(token *jwtLib.Token) (interface{}, error) {
 		_, ok := token.Method.(*jwtLib.SigningMethodHMAC)
 		if !ok {
@@ -259,24 +259,24 @@ func (s *Service) IsAccessTokenValid(ctx context.Context, signedToken string) er
 		keyFunc,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	claims, ok := token.Claims.(*jwtLib.RegisteredClaims)
 	if !ok && !token.Valid {
-		return ErrInvalidOrExpiredToken
+		return nil, ErrInvalidOrExpiredToken
 	}
 	key := fmt.Sprintf("blacklist:%s", claims.ID)
 	isBlacklisted, err := s.redisClient.Exists(ctx, key).Result()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if isBlacklisted > 0 {
-		return ErrAccessTokenIsBlacklisted
+		return nil, ErrAccessTokenIsBlacklisted
 	}
 	if claims.Issuer != TOKENISSUER {
-		return ErrInvalidOrExpiredToken
+		return nil, ErrInvalidOrExpiredToken
 	}
-	return nil
+	return token, nil
 }
 
 func TokenClaims(ctx context.Context, signedToken string) (*jwtLib.RegisteredClaims, error) {

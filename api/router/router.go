@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Mohamadreza-shad/simple-authentication/api"
+	"github.com/Mohamadreza-shad/simple-authentication/api/middleware"
 	"github.com/Mohamadreza-shad/simple-authentication/logger"
 	"github.com/Mohamadreza-shad/simple-authentication/service/user"
 	"github.com/gin-contrib/cors"
@@ -37,10 +38,14 @@ func New(
 			})
 	})
 
-	r.POST("api/user/signup", userHandler.SignUp)
-	r.POST("api/user/signin", userHandler.SignIn)
-	r.POST("api/user/refresh-token", userHandler.RefreshToken)
-	r.POST("api/user/logout", userHandler.LogOut)
+	r.POST("/api/user/signup", userHandler.SignUp)
+	r.POST("/api/user/signin", userHandler.SignIn)
+	r.POST("/api/user/refresh-token", userHandler.RefreshToken)
+	r.POST("/api/user/logout", userHandler.LogOut)
+
+	v1 := r.Group("/api/v1")
+	v1.Use(middleware.AuthMiddleware(userService))
+	v1.GET("/api/v1/user", nil)
 	return &Router{
 		Handler: r,
 	}
