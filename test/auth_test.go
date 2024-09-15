@@ -45,11 +45,11 @@ func Test_UserCannot_SignUp_UsernameIsAlreadyTaken(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/signup", userHandler.SignUp)
+	r.POST("api/user/signup", authHandler.SignUp)
 
 	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
 		Username:     "test-user",
@@ -109,11 +109,11 @@ func Test_User_SignUp_Successfully(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/signup", userHandler.SignUp)
+	r.POST("api/user/signup", authHandler.SignUp)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -197,11 +197,11 @@ func Test_User_SingIn_NoUserFoundPleaseSignUp(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/signin", userHandler.SignIn)
+	r.POST("api/user/signin", authHandler.SignIn)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -249,7 +249,7 @@ func Test_User_SingIn_ErrUsernameOrPasswordIsIncorrect(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
 		Username:     "test-user",
@@ -261,7 +261,7 @@ func Test_User_SingIn_ErrUsernameOrPasswordIsIncorrect(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/signin", userHandler.SignIn)
+	r.POST("api/user/signin", authHandler.SignIn)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -309,7 +309,7 @@ func Test_User_SingIn_Successful(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	hashedPassword, err := bcrypt.GenerateFromPassword(
 		[]byte("p@ssW0rd"),
@@ -326,7 +326,7 @@ func Test_User_SingIn_Successful(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/signin", userHandler.SignIn)
+	r.POST("api/user/signin", authHandler.SignIn)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -394,11 +394,11 @@ func Test_RefreshToken_RefreshTokenIsNotInRedis(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/refresh-token", userHandler.RefreshToken)
+	r.POST("api/user/refresh-token", authHandler.RefreshToken)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -445,11 +445,11 @@ func Test_RefreshToken_RefreshTokenIsInRedisButIsMalformed(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/refresh-token", userHandler.RefreshToken)
+	r.POST("api/user/refresh-token", authHandler.RefreshToken)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -505,11 +505,11 @@ func Test_RefreshToken_RefreshTokenIsInRedisAndIsInAValidShapeButExpired(t *test
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/refresh-token", userHandler.RefreshToken)
+	r.POST("api/user/refresh-token", authHandler.RefreshToken)
 
 	params := auth.RefreshTokenParams{
 		UserId: "1",
@@ -577,11 +577,11 @@ func Test_RefreshToken_Successful(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/refresh-token", userHandler.RefreshToken)
+	r.POST("api/user/refresh-token", authHandler.RefreshToken)
 
 	params := auth.RefreshTokenParams{
 		UserId: "1",
@@ -647,11 +647,11 @@ func Test_User_LogOut_RefreshTokenIsNotInRedis(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/logout", userHandler.LogOut)
+	r.POST("api/user/logout", authHandler.LogOut)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -699,11 +699,11 @@ func Test_User_LogOut_RefreshTokenIsInRedisButIsMalformed(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/logout", userHandler.LogOut)
+	r.POST("api/user/logout", authHandler.LogOut)
 
 	server := httptest.NewServer(r)
 	defer server.Close()
@@ -760,11 +760,11 @@ func Test_User_LogOut_RefreshTokenIsInRedisAndIsInAValidShapeButExpired(t *testi
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/logout", userHandler.LogOut)
+	r.POST("api/user/logout", authHandler.LogOut)
 
 	params := auth.LogOutParams{
 		UserId:      "1",
@@ -833,11 +833,11 @@ func Test_User_LogOut_Successful(t *testing.T) {
 	assert.Nil(err)
 	repo := repository.New()
 	authService := auth.New(db, repo, redisClient, logger)
-	userHandler := api.NewAuthHandler(authService, validator)
+	authHandler := api.NewAuthHandler(authService, validator)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.POST("api/user/logout", userHandler.LogOut)
+	r.POST("api/user/logout", authHandler.LogOut)
 
 	params := auth.LogOutParams{
 		UserId:      "1",

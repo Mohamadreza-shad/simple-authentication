@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strconv"
+
 	"github.com/Mohamadreza-shad/simple-authentication/api/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -10,9 +12,13 @@ func readUserIDFromContext(c *gin.Context) (int64, bool) {
 	if !exist {
 		return 0, false
 	}
-	userIdInString, ok := userId.(int64)
+	userIdInString, ok := userId.(string)
 	if !ok {
 		return 0, false
 	}
-	return userIdInString, true
+	id, err := strconv.Atoi(userIdInString)
+	if err != nil {
+		return 0, false
+	}
+	return int64(id), true
 }

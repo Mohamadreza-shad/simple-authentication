@@ -158,11 +158,11 @@ func (h *AuthHandler) LogOut(c *gin.Context) {
 }
 
 func NewAuthHandler(
-	userService *auth.Service,
+	authService *auth.Service,
 	validator *validator.Validate,
 ) *AuthHandler {
 	return &AuthHandler{
-		authService: userService,
+		authService: authService,
 		validator:   validator,
 	}
 }
