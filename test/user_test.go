@@ -15,6 +15,7 @@ import (
 	"github.com/Mohamadreza-shad/simple-authentication/repository"
 	"github.com/Mohamadreza-shad/simple-authentication/service/user"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/go-playground/validator/v10"
 	jwtLib "github.com/golang-jwt/jwt/v5"
@@ -27,7 +28,7 @@ type ResponseSuccess struct {
 	Data    user.SignUpResponse `json:"data,omitempty"`
 }
 
-func Test_UserCannot_Signup_UsernameIsAlreadyTaken(t *testing.T) {
+func Test_UserCannot_SignUp_UsernameIsAlreadyTaken(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	assert := assert.New(t)
@@ -49,7 +50,7 @@ func Test_UserCannot_Signup_UsernameIsAlreadyTaken(t *testing.T) {
 
 	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
 		Username:     "test-user",
-		Password:     "p@sW0rd",
+		Password:     "p@ssW0rd",
 		NationalCode: "1234567890",
 		Phone:        "09123456789",
 	})
@@ -60,7 +61,7 @@ func Test_UserCannot_Signup_UsernameIsAlreadyTaken(t *testing.T) {
 
 	paramsInJson, err := json.Marshal(user.SignUpParams{
 		Username:     "test-user",
-		Password:     "p@sW0rd",
+		Password:     "p@ssW0rd",
 		NationalCode: "1234567890",
 		Phone:        "09123456789",
 	})
@@ -91,7 +92,7 @@ func Test_UserCannot_Signup_UsernameIsAlreadyTaken(t *testing.T) {
 	assert.Equal(response.Error.Message, user.ErrUsernameAlreadyTaken.Error())
 }
 
-func Test_User_Signup_Successfully(t *testing.T) {
+func Test_User_SignUp_Successfully(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	assert := assert.New(t)
@@ -116,7 +117,7 @@ func Test_User_Signup_Successfully(t *testing.T) {
 
 	paramsInJson, err := json.Marshal(user.SignUpParams{
 		Username:     "test-user",
-		Password:     "p@sW0rd",
+		Password:     "p@ssW0rd",
 		NationalCode: "1234567890",
 		Phone:        "09123456789",
 	})
@@ -161,6 +162,204 @@ func Test_User_Signup_Successfully(t *testing.T) {
 	assert.NotEqual(refreshToken, "")
 
 	// Check if the access token is valid
+	token, err := jwtLib.ParseWithClaims(
+		refreshToken,
+		&jwtLib.RegisteredClaims{},
+		func(token *jwtLib.Token) (interface{}, error) {
+			// Ensure the signing method is what you expect
+			_, ok := token.Method.(*jwtLib.SigningMethodHMAC)
+			assert.True(ok)
+			// Return the secret key used for signing the token
+			return []byte(config.SecretKey()), nil
+		})
+	assert.Nil(err)
+	claims, ok := token.Claims.(*jwtLib.RegisteredClaims)
+	assert.True(ok)
+	assert.True(token.Valid)
+	assert.Equal(claims.Issuer, user.TOKENISSUER)
+	assert.Equal(claims.Subject, fmt.Sprintf("userId:%d", createdUser.ID))
+}
+
+func Test_User_SingIn_NoUserFoundPleaseSignUp(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signin", userHandler.SignIn)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(user.SignInParams{
+		Username: "test-user",
+		Password: "p@ssW0rd",
+	})
+	assert.Nil(err)
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signin", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+
+	//Act
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+
+	defer resp.Body.Close()
+	response, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	var res api.ResponseFailure
+	err = json.Unmarshal(response, &res)
+
+	//Assert
+	assert.Nil(err)
+	assert.False(res.Success)
+	assert.Equal(res.Error.Code, http.StatusNotFound)
+	assert.Equal(res.Error.Message, user.ErrNoUserFoundPleaseSignUp.Error())
+}
+
+func Test_User_SingIn_ErrUsernameOrPasswordIsIncorrect(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+
+	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
+		Username:     "test-user",
+		Password:     "p@ssW0rd",
+		NationalCode: "1234567890",
+		Phone:        "09123456789",
+	})
+	assert.Nil(err)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signin", userHandler.SignIn)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(user.SignInParams{
+		Username: "test-user",
+		Password: "iccorrect-p@ssword",
+	})
+	assert.Nil(err)
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signin", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+
+	//Act
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+
+	defer resp.Body.Close()
+	response, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	var res api.ResponseFailure
+	err = json.Unmarshal(response, &res)
+
+	//Assert
+	assert.Nil(err)
+	assert.False(res.Success)
+	assert.Equal(res.Error.Code, http.StatusUnauthorized)
+	assert.Equal(res.Error.Message, user.ErrUsernameOrPasswordIsIncorrect.Error())
+}
+
+func Test_User_SingIn_Successful(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+
+	hashedPassword, err := bcrypt.GenerateFromPassword(
+		[]byte("p@ssW0rd"),
+		bcrypt.DefaultCost,
+	)
+	assert.Nil(err)
+	createdUser, err := repo.SignUp(ctx, db, repository.SignUpParams{
+		Username:     "test-user",
+		Password:     string(hashedPassword),
+		NationalCode: "1234567890",
+		Phone:        "09123456789",
+	})
+	assert.Nil(err)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signin", userHandler.SignIn)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(user.SignInParams{
+		Username: "test-user",
+		Password: "p@ssW0rd",
+	})
+	assert.Nil(err)
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signin", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+
+	//Act
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+	response, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	var res ResponseSuccess
+	err = json.Unmarshal(response, &res)
+
+	//Assert
+	assert.Nil(err)
+	assert.True(res.Success)
+	assert.NotEqual(res.Data.AccessToken, "")
+	assert.NotEqual(res.Data.RefreshToken, "")
+	assert.Equal(res.Message, "user signed in successfully")
+
+	refreshToken, err := redisClient.Get(ctx, fmt.Sprintf("userId:%d", createdUser.ID)).Result()
+	assert.Nil(err)
+	assert.NotEqual(refreshToken, "")
+
 	token, err := jwtLib.ParseWithClaims(
 		refreshToken,
 		&jwtLib.RegisteredClaims{},

@@ -26,6 +26,8 @@ const (
 var (
 	ErrSomethingWentWrong   = errors.New("something went wrong")
 	ErrUsernameAlreadyTaken = errors.New("username already taken")
+	ErrNoUserFoundPleaseSignUp = errors.New("no user found please sign up")
+	ErrUsernameOrPasswordIsIncorrect = errors.New("username or password is incorrect")
 )
 
 type Service struct {
@@ -100,20 +102,42 @@ func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpRespon
 	}, nil
 }
 
-func (s *Service) SignIn(ctx context.Context, username, password string) (SignUpResponse, error) {
-	//find user by username
-	//check if credentials are correct
-	//generate access token
-	//generate refresh token
-	//save refresh token in redis
-	//return access token and refresh token
-	return SignUpResponse{}, nil
+func (s *Service) SignIn(ctx context.Context, params SignInParams) (SignUpResponse, error) {
+	fetchedUser,err := s.repo.UserByName(ctx, s.db, params.Username)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SignUpResponse{}, ErrNoUserFoundPleaseSignUp
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(fetchedUser.Password), []byte(params.Password))
+	if err != nil {
+		return SignUpResponse{}, ErrUsernameOrPasswordIsIncorrect
+	}
+	userIdString := strconv.Itoa(int(fetchedUser.ID))
+	accessToken, err := generateAccessToken(userIdString)
+	if err != nil {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	refreshToken, err := generateRefreshToken(userIdString)
+	if err != nil {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	key := "userId:" + userIdString
+	err = s.redisClient.Set(ctx, key, refreshToken, REFRESHTOKENEXPIREDIN*24*time.Hour).Err()
+	if err != nil {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	return SignUpResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func generateAccessToken(userId string) (string, error) {
 	claims := jwtLib.RegisteredClaims{
 		Issuer:    TOKENISSUER,
-		Subject:   fmt.Sprintf("userId:%s",userId),
+		Subject:   fmt.Sprintf("userId:%s", userId),
 		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
 		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(ACCESSTOKENEXPIREDIN * time.Minute)},
 	}
@@ -128,7 +152,7 @@ func generateAccessToken(userId string) (string, error) {
 func generateRefreshToken(userId string) (string, error) {
 	claims := jwtLib.RegisteredClaims{
 		Issuer:    TOKENISSUER,
-		Subject:   fmt.Sprintf("userId:%s",userId),
+		Subject:   fmt.Sprintf("userId:%s", userId),
 		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
 		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(REFRESHTOKENEXPIREDIN * 24 * time.Hour)},
 	}
