@@ -12,6 +12,7 @@ import (
 	"github.com/Mohamadreza-shad/simple-authentication/logger"
 	"github.com/Mohamadreza-shad/simple-authentication/repository"
 	jwtLib "github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
@@ -24,12 +25,13 @@ const (
 )
 
 var (
-	ErrSomethingWentWrong            = errors.New("something went wrong")
-	ErrUsernameAlreadyTaken          = errors.New("username already taken")
-	ErrNoUserFoundPleaseSignUp       = errors.New("no user found please sign up")
-	ErrInvalidOrExpiredToken         = errors.New("invalid or expired token")
-	ErrInvalidOrExpiredTokenPleaseSignInAgain         = errors.New("invalid or expired token. Please login again")
-	ErrUsernameOrPasswordIsIncorrect = errors.New("username or password is incorrect")
+	ErrSomethingWentWrong                     = errors.New("something went wrong")
+	ErrUsernameAlreadyTaken                   = errors.New("username already taken")
+	ErrNoUserFoundPleaseSignUp                = errors.New("no user found please sign up")
+	ErrInvalidOrExpiredToken                  = errors.New("invalid or expired token")
+	ErrInvalidOrExpiredTokenPleaseSignInAgain = errors.New("invalid or expired token. Please login again")
+	ErrUsernameOrPasswordIsIncorrect          = errors.New("username or password is incorrect")
+	ErrAccessTokenIsBlacklisted               = errors.New("access token is blacklisted")
 )
 
 type Service struct {
@@ -58,6 +60,12 @@ type SignInParams struct {
 
 type RefreshTokenParams struct {
 	UserId       string `json:"userId" validate:"required"`
+	RefreshToken string `json:"refreshToken" validate:"required"`
+}
+
+type LogOutParams struct {
+	UserId       string `json:"userId" validate:"required"`
+	AccessToken  string `json:"accessToken" validate:"required"`
 	RefreshToken string `json:"refreshToken" validate:"required"`
 }
 
@@ -150,7 +158,7 @@ func (s *Service) RefreshToken(ctx context.Context, params RefreshTokenParams) (
 	if errors.Is(err, redis.Nil) {
 		return SignUpResponse{}, ErrInvalidOrExpiredTokenPleaseSignInAgain
 	}
-	err = TokenValidity(ctx, params.RefreshToken)
+	err = IsRefreshTokenValid(ctx, params.RefreshToken)
 	if err != nil {
 		return SignUpResponse{}, ErrInvalidOrExpiredTokenPleaseSignInAgain
 	}
@@ -172,7 +180,46 @@ func (s *Service) RefreshToken(ctx context.Context, params RefreshTokenParams) (
 	}, nil
 }
 
-func TokenValidity(ctx context.Context, signedToken string) error {
+func (s *Service) LogOut(ctx context.Context, params LogOutParams) error {
+	redisKey := fmt.Sprintf("userId:%s", params.UserId)
+	_, err := s.redisClient.Get(ctx, redisKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return ErrSomethingWentWrong
+	}
+	if errors.Is(err, redis.Nil) {
+		return ErrInvalidOrExpiredTokenPleaseSignInAgain
+	}
+	err = IsRefreshTokenValid(ctx, params.RefreshToken)
+	if err != nil {
+		return ErrInvalidOrExpiredTokenPleaseSignInAgain
+	}
+	err = s.redisClient.Del(ctx, redisKey).Err()
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	claims, err := TokenClaims(ctx, params.AccessToken)
+	if err != nil {
+		return ErrInvalidOrExpiredTokenPleaseSignInAgain
+	}
+	err = s.BlacklistToken(claims.ID)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	return nil
+}
+
+func (s *Service) BlacklistToken(jti string) error {
+	key := fmt.Sprintf("blacklist:%s", jti)
+	err := s.redisClient.Set(
+		context.Background(),
+		key,
+		true,
+		ACCESSTOKENEXPIREDIN*time.Minute,
+	).Err()
+	return err
+}
+
+func IsRefreshTokenValid(ctx context.Context, signedToken string) error {
 	keyFunc := func(token *jwtLib.Token) (interface{}, error) {
 		_, ok := token.Method.(*jwtLib.SigningMethodHMAC)
 		if !ok {
@@ -186,21 +233,80 @@ func TokenValidity(ctx context.Context, signedToken string) error {
 		keyFunc,
 	)
 	if err != nil {
-		return ErrInvalidOrExpiredToken
+		return err
 	}
 	claims, ok := token.Claims.(*jwtLib.RegisteredClaims)
-	if ok && token.Valid {
-		if claims.Issuer != TOKENISSUER {
-			return ErrInvalidOrExpiredToken
-		}
+	if !ok && !token.Valid {
+		return ErrInvalidOrExpiredToken
+	}
+	if claims.Issuer != TOKENISSUER {
+		return ErrInvalidOrExpiredToken
 	}
 	return nil
+}
+
+func (s *Service) IsAccessTokenValid(ctx context.Context, signedToken string) error {
+	keyFunc := func(token *jwtLib.Token) (interface{}, error) {
+		_, ok := token.Method.(*jwtLib.SigningMethodHMAC)
+		if !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(config.SecretKey()), nil
+	}
+	token, err := jwtLib.ParseWithClaims(
+		signedToken,
+		&jwtLib.RegisteredClaims{},
+		keyFunc,
+	)
+	if err != nil {
+		return err
+	}
+	claims, ok := token.Claims.(*jwtLib.RegisteredClaims)
+	if !ok && !token.Valid {
+		return ErrInvalidOrExpiredToken
+	}
+	key := fmt.Sprintf("blacklist:%s", claims.ID)
+	isBlacklisted, err := s.redisClient.Exists(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	if isBlacklisted > 0 {
+		return ErrAccessTokenIsBlacklisted
+	}
+	if claims.Issuer != TOKENISSUER {
+		return ErrInvalidOrExpiredToken
+	}
+	return nil
+}
+
+func TokenClaims(ctx context.Context, signedToken string) (*jwtLib.RegisteredClaims, error) {
+	keyFunc := func(token *jwtLib.Token) (interface{}, error) {
+		_, ok := token.Method.(*jwtLib.SigningMethodHMAC)
+		if !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(config.SecretKey()), nil
+	}
+	token, err := jwtLib.ParseWithClaims(
+		signedToken,
+		&jwtLib.RegisteredClaims{},
+		keyFunc,
+	)
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(*jwtLib.RegisteredClaims)
+	if !ok {
+		return nil, err
+	}
+	return claims, nil
 }
 
 func generateAccessToken(userId string) (string, error) {
 	claims := jwtLib.RegisteredClaims{
 		Issuer:    TOKENISSUER,
 		Subject:   fmt.Sprintf("userId:%s", userId),
+		ID:        uuid.NewString(),
 		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
 		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(ACCESSTOKENEXPIREDIN * time.Minute)},
 	}

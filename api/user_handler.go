@@ -120,6 +120,39 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, res, "Access toke generated successfully")
 }
 
+func (h *UserHandler) LogOut(c *gin.Context){
+	params := user.LogOutParams{}
+	err := c.BindJSON(&params)
+	if err != nil {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusBadRequest,
+			"Bad Request: "+err.Error(),
+		)
+		return
+	}
+	err = h.validator.Struct(params)
+	if err != nil {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusBadRequest,
+			"invalid request"+err.Error())
+		return
+	}
+	err = h.userService.LogOut(c.Request.Context(),params)
+	if err != nil && errors.Is(err, user.ErrInvalidOrExpiredTokenPleaseSignInAgain) {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusUnauthorized,
+			err.Error())
+		return
+	}
+	if err != nil {
+		MakeErrorResponseWithoutCode(c.Writer, err)
+	}
+	MakeSuccessResponse(c.Writer,nil,"use logged out successfully")
+}
+
 func NewUserHandler(
 	userService *user.Service,
 	validator *validator.Validate,

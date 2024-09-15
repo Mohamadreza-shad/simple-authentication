@@ -40,6 +40,7 @@ func New(
 	r.POST("api/user/signup", userHandler.SignUp)
 	r.POST("api/user/signin", userHandler.SignIn)
 	r.POST("api/user/refresh-token", userHandler.RefreshToken)
+	r.POST("api/user/logout", userHandler.LogOut)
 	return &Router{
 		Handler: r,
 	}

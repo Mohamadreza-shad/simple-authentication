@@ -16,6 +16,8 @@ import (
 	"github.com/Mohamadreza-shad/simple-authentication/repository"
 	"github.com/Mohamadreza-shad/simple-authentication/service/user"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/go-playground/validator/v10"
@@ -490,7 +492,7 @@ func Test_RefreshToken_RefreshTokenIsInRedisButIsMalformed(t *testing.T) {
 	assert.Equal(res.Error.Message, user.ErrInvalidOrExpiredTokenPleaseSignInAgain.Error())
 }
 
-func Test_RefreshToken_RefreshTokenIsInRedisButIsInAValidShapeButExpired(t *testing.T) {
+func Test_RefreshToken_RefreshTokenIsInRedisAndIsInAValidShapeButExpired(t *testing.T) {
 	ctx := context.Background()
 	assert := assert.New(t)
 	logger := getLogger()
@@ -545,7 +547,7 @@ func Test_RefreshToken_RefreshTokenIsInRedisButIsInAValidShapeButExpired(t *test
 
 	//Act
 	//We should wait 2 seconds to make sure that the refresh-token is expired
-	time.Sleep(2*time.Second)
+	time.Sleep(2 * time.Second)
 	resp, err := http.DefaultClient.Do(req)
 	assert.Nil(err)
 
@@ -628,6 +630,288 @@ func Test_RefreshToken_Successful(t *testing.T) {
 
 	//Assert
 	assert.True(res.Success)
-	assert.NotEqual(res.Data.AccessToken,"")
-	assert.NotEqual(res.Data.RefreshToken,"")
+	assert.NotEqual(res.Data.AccessToken, "")
+	assert.NotEqual(res.Data.RefreshToken, "")
 }
+
+func Test_User_LogOut_RefreshTokenIsNotInRedis(t *testing.T) {
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/logout", userHandler.LogOut)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(user.LogOutParams{
+		UserId:       "1",
+		RefreshToken: "user-signed-refresh-token",
+		AccessToken:  "user-signed-access-token",
+	})
+	assert.Nil(err)
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/logout", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+
+	//Act
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+
+	defer resp.Body.Close()
+	response, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	var res api.ResponseFailure
+	err = json.Unmarshal(response, &res)
+	assert.Nil(err)
+
+	//Assert
+	assert.False(res.Success)
+	assert.Equal(res.Error.Code, http.StatusUnauthorized)
+	assert.Equal(res.Error.Message, user.ErrInvalidOrExpiredTokenPleaseSignInAgain.Error())
+}
+
+func Test_User_LogOut_RefreshTokenIsInRedisButIsMalformed(t *testing.T) {
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/logout", userHandler.LogOut)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	params := user.LogOutParams{
+		UserId:       "1",
+		RefreshToken: "user-signed-refresh-token",
+		AccessToken:  "user-signed-access-token",
+	}
+	paramsInJson, err := json.Marshal(params)
+	assert.Nil(err)
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/logout", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+
+	err = redisClient.Set(
+		ctx,
+		fmt.Sprintf("userId:%s", params.UserId),
+		params.RefreshToken,
+		7*24*time.Hour,
+	).Err()
+	assert.Nil(err)
+
+	//Act
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+
+	defer resp.Body.Close()
+	response, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	var res api.ResponseFailure
+	err = json.Unmarshal(response, &res)
+	assert.Nil(err)
+
+	//Assert
+	assert.False(res.Success)
+	assert.Equal(res.Error.Code, http.StatusUnauthorized)
+	assert.Equal(res.Error.Message, user.ErrInvalidOrExpiredTokenPleaseSignInAgain.Error())
+}
+
+func Test_User_LogOut_RefreshTokenIsInRedisAndIsInAValidShapeButExpired(t *testing.T) {
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/logout", userHandler.LogOut)
+
+	params := user.LogOutParams{
+		UserId:      "1",
+		AccessToken: "user-signed-access-token",
+	}
+	claims := jwtLib.RegisteredClaims{
+		Issuer:    user.TOKENISSUER,
+		Subject:   fmt.Sprintf("userId:%s", params.UserId),
+		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
+		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(2 * time.Second)},
+	}
+	refreshToken := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, claims)
+	signedRefreshToken, err := refreshToken.SignedString([]byte(config.SecretKey()))
+	params.RefreshToken = signedRefreshToken
+	assert.Nil(err)
+
+	err = redisClient.Set(
+		ctx,
+		fmt.Sprintf("userId:%s", params.UserId),
+		params.RefreshToken,
+		7*24*time.Hour,
+	).Err()
+	assert.Nil(err)
+
+	paramsInJson, err := json.Marshal(params)
+	assert.Nil(err)
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/logout", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+
+	//Act
+	//We should wait 2 seconds to make sure that the refresh-token is expired
+	time.Sleep(2 * time.Second)
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+
+	defer resp.Body.Close()
+	response, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	var res api.ResponseFailure
+	err = json.Unmarshal(response, &res)
+	assert.Nil(err)
+
+	//Assert
+	assert.False(res.Success)
+	assert.Equal(res.Error.Code, http.StatusUnauthorized)
+	assert.Equal(res.Error.Message, user.ErrInvalidOrExpiredTokenPleaseSignInAgain.Error())
+}
+
+func Test_User_LogOut_Successful(t *testing.T) {
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	userService := user.New(db, repo, redisClient, logger)
+	userHandler := api.NewUserHandler(userService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/logout", userHandler.LogOut)
+
+	params := user.LogOutParams{
+		UserId:      "1",
+		AccessToken: "user-signed-access-token",
+	}
+	jti := uuid.NewString()
+	claims := jwtLib.RegisteredClaims{
+		Issuer:    user.TOKENISSUER,
+		ID:        jti,
+		Subject:   fmt.Sprintf("userId:%s", params.UserId),
+		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
+		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(15 * time.Minute)},
+	}
+	accessToken := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, claims)
+	signedAccessToken, err := accessToken.SignedString([]byte(config.SecretKey()))
+	assert.Nil(err)
+
+	claims = jwtLib.RegisteredClaims{
+		Issuer:    user.TOKENISSUER,
+		Subject:   fmt.Sprintf("userId:%s", params.UserId),
+		IssuedAt:  &jwtLib.NumericDate{Time: time.Now()},
+		ExpiresAt: &jwtLib.NumericDate{Time: time.Now().Add(7*24*time.Hour)},
+	}
+	refreshToken := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, claims)
+	signedRefreshToken, err := refreshToken.SignedString([]byte(config.SecretKey()))
+	assert.Nil(err)
+
+	params.RefreshToken = signedRefreshToken
+	params.AccessToken = signedAccessToken
+
+	err = redisClient.Set(
+		ctx,
+		fmt.Sprintf("userId:%s", params.UserId),
+		params.RefreshToken,
+		7*24*time.Hour,
+	).Err()
+	assert.Nil(err)
+
+	paramsInJson, err := json.Marshal(params)
+	assert.Nil(err)
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/logout", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+
+	//Act
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+
+	defer resp.Body.Close()
+	response, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	var res ResponseSuccess
+	err = json.Unmarshal(response, &res)
+	assert.Nil(err)
+
+	//Assert
+	assert.True(res.Success)
+	assert.Equal(res.Message, "use logged out successfully")
+
+	//check if refresh token is deleted from redis
+	redisKey := fmt.Sprintf("userId:%s", params.UserId)
+	err = redisClient.Get(ctx,redisKey).Err()
+	assert.Equal(err,redis.Nil)
+
+	blacklistKey := fmt.Sprintf("blacklist:%s", jti)
+	blackListedAccessKey,err := redisClient.Get(ctx,blacklistKey).Bool()
+	assert.Nil(err)
+	assert.True(blackListedAccessKey)
+}
+
+
