@@ -24,9 +24,11 @@ const (
 )
 
 var (
-	ErrSomethingWentWrong   = errors.New("something went wrong")
-	ErrUsernameAlreadyTaken = errors.New("username already taken")
-	ErrNoUserFoundPleaseSignUp = errors.New("no user found please sign up")
+	ErrSomethingWentWrong            = errors.New("something went wrong")
+	ErrUsernameAlreadyTaken          = errors.New("username already taken")
+	ErrNoUserFoundPleaseSignUp       = errors.New("no user found please sign up")
+	ErrInvalidOrExpiredToken         = errors.New("invalid or expired token")
+	ErrInvalidOrExpiredTokenPleaseSignInAgain         = errors.New("invalid or expired token. Please login again")
 	ErrUsernameOrPasswordIsIncorrect = errors.New("username or password is incorrect")
 )
 
@@ -52,6 +54,11 @@ type SignUpResponse struct {
 type SignInParams struct {
 	Username string `json:"username" validate:"required"`
 	Password string `json:"password" validate:"required"`
+}
+
+type RefreshTokenParams struct {
+	UserId       string `json:"userId" validate:"required"`
+	RefreshToken string `json:"refreshToken" validate:"required"`
 }
 
 func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpResponse, error) {
@@ -103,7 +110,7 @@ func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpRespon
 }
 
 func (s *Service) SignIn(ctx context.Context, params SignInParams) (SignUpResponse, error) {
-	fetchedUser,err := s.repo.UserByName(ctx, s.db, params.Username)
+	fetchedUser, err := s.repo.UserByName(ctx, s.db, params.Username)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return SignUpResponse{}, ErrSomethingWentWrong
 	}
@@ -132,6 +139,62 @@ func (s *Service) SignIn(ctx context.Context, params SignInParams) (SignUpRespon
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
+}
+
+func (s *Service) RefreshToken(ctx context.Context, params RefreshTokenParams) (SignUpResponse, error) {
+	redisKey := fmt.Sprintf("userId:%s", params.UserId)
+	_, err := s.redisClient.Get(ctx, redisKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	if errors.Is(err, redis.Nil) {
+		return SignUpResponse{}, ErrInvalidOrExpiredTokenPleaseSignInAgain
+	}
+	err = TokenValidity(ctx, params.RefreshToken)
+	if err != nil {
+		return SignUpResponse{}, ErrInvalidOrExpiredTokenPleaseSignInAgain
+	}
+	accessToken, err := generateAccessToken(params.UserId)
+	if err != nil {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	refreshToken, err := generateRefreshToken(params.UserId)
+	if err != nil {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	err = s.redisClient.Set(ctx, redisKey, refreshToken, REFRESHTOKENEXPIREDIN*24*time.Hour).Err()
+	if err != nil {
+		return SignUpResponse{}, ErrSomethingWentWrong
+	}
+	return SignUpResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+func TokenValidity(ctx context.Context, signedToken string) error {
+	keyFunc := func(token *jwtLib.Token) (interface{}, error) {
+		_, ok := token.Method.(*jwtLib.SigningMethodHMAC)
+		if !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(config.SecretKey()), nil
+	}
+	token, err := jwtLib.ParseWithClaims(
+		signedToken,
+		&jwtLib.RegisteredClaims{},
+		keyFunc,
+	)
+	if err != nil {
+		return ErrInvalidOrExpiredToken
+	}
+	claims, ok := token.Claims.(*jwtLib.RegisteredClaims)
+	if ok && token.Valid {
+		if claims.Issuer != TOKENISSUER {
+			return ErrInvalidOrExpiredToken
+		}
+	}
+	return nil
 }
 
 func generateAccessToken(userId string) (string, error) {
