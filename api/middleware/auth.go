@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Mohamadreza-shad/simple-authentication/service/user"
+	"github.com/Mohamadreza-shad/simple-authentication/service/auth"
 	"github.com/gin-gonic/gin"
 	jwtLib "github.com/golang-jwt/jwt/v5"
 )
@@ -16,7 +16,7 @@ const (
 	UserIdKey     = "UserId"
 )
 
-func AuthMiddleware(s *user.Service) gin.HandlerFunc {
+func AuthMiddleware(s *auth.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		signedAccessToken := extractTokenFromRequest(c.Request)
 		if strings.EqualFold(signedAccessToken, "") {

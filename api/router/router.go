@@ -7,7 +7,7 @@ import (
 	"github.com/Mohamadreza-shad/simple-authentication/api"
 	"github.com/Mohamadreza-shad/simple-authentication/api/middleware"
 	"github.com/Mohamadreza-shad/simple-authentication/logger"
-	"github.com/Mohamadreza-shad/simple-authentication/service/user"
+	"github.com/Mohamadreza-shad/simple-authentication/service/auth"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -18,8 +18,9 @@ type Router struct {
 }
 
 func New(
+	authHandler *api.AuthHandler,
 	userHandler *api.UserHandler,
-	userService *user.Service,
+	authService *auth.Service,
 	logger *logger.Logger,
 ) *Router {
 	gin.SetMode(gin.ReleaseMode)
@@ -38,14 +39,15 @@ func New(
 			})
 	})
 
-	r.POST("/api/user/signup", userHandler.SignUp)
-	r.POST("/api/user/signin", userHandler.SignIn)
-	r.POST("/api/user/refresh-token", userHandler.RefreshToken)
-	r.POST("/api/user/logout", userHandler.LogOut)
+	r.POST("/api/user/signup", authHandler.SignUp)
+	r.POST("/api/user/signin", authHandler.SignIn)
+	r.POST("/api/user/refresh-token", authHandler.RefreshToken)
+	r.POST("/api/user/logout", authHandler.LogOut)
 
 	v1 := r.Group("/api/v1")
-	v1.Use(middleware.AuthMiddleware(userService))
-	v1.GET("/api/v1/user", nil)
+	v1.Use(middleware.AuthMiddleware(authService))
+	v1.GET("/user", userHandler.UserById)
+
 	return &Router{
 		Handler: r,
 	}
