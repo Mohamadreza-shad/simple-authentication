@@ -54,8 +54,6 @@ func Test_UserCannot_SignUp_UsernameIsAlreadyTaken(t *testing.T) {
 	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
 		Username:     "test-user",
 		Password:     "p@ssW0rd",
-		NationalCode: "1234567890",
-		Phone:        "09123456789",
 	})
 	assert.Nil(err)
 
@@ -65,8 +63,6 @@ func Test_UserCannot_SignUp_UsernameIsAlreadyTaken(t *testing.T) {
 	paramsInJson, err := json.Marshal(auth.SignUpParams{
 		Username:     "test-user",
 		Password:     "p@ssW0rd",
-		NationalCode: "1234567890",
-		Phone:        "09123456789",
 	})
 	assert.Nil(err)
 
@@ -121,8 +117,6 @@ func Test_User_SignUp_Successfully(t *testing.T) {
 	paramsInJson, err := json.Marshal(auth.SignUpParams{
 		Username:     "test-user",
 		Password:     "p@ssW0rd",
-		NationalCode: "1234567890",
-		Phone:        "09123456789",
 	})
 	assert.Nil(err)
 
@@ -155,8 +149,6 @@ func Test_User_SignUp_Successfully(t *testing.T) {
 	assert.Nil(err)
 	assert.NotNil(createdUser)
 	assert.Equal(createdUser.Username, "test-user")
-	assert.Equal(createdUser.NationalCode, "1234567890")
-	assert.Equal(createdUser.Phone, "09123456789")
 	assert.True(createdUser.IsActive)
 
 	// Check if the refresh token is saved in the redis
@@ -254,8 +246,6 @@ func Test_User_SingIn_ErrUsernameOrPasswordIsIncorrect(t *testing.T) {
 	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
 		Username:     "test-user",
 		Password:     "p@ssW0rd",
-		NationalCode: "1234567890",
-		Phone:        "09123456789",
 	})
 	assert.Nil(err)
 
@@ -319,8 +309,6 @@ func Test_User_SingIn_Successful(t *testing.T) {
 	createdUser, err := repo.SignUp(ctx, db, repository.SignUpParams{
 		Username:     "test-user",
 		Password:     string(hashedPassword),
-		NationalCode: "1234567890",
-		Phone:        "09123456789",
 	})
 	assert.Nil(err)
 

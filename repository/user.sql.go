@@ -14,29 +14,20 @@ import (
 const signUp = `-- name: SignUp :one
 INSERT INTO users(
 username,
-password,
-national_code,
-phone
+password
 ) VALUES(
-    $1,$2,$3,$4
+    $1,$2
 )
 RETURNING id, username, password, national_code, phone, email, is_active, created_at, updated_at
 `
 
 type SignUpParams struct {
-	Username     string
-	Password     string
-	NationalCode string
-	Phone        string
+	Username string
+	Password string
 }
 
 func (q *Queries) SignUp(ctx context.Context, db DBTX, arg SignUpParams) (User, error) {
-	row := db.QueryRow(ctx, signUp,
-		arg.Username,
-		arg.Password,
-		arg.NationalCode,
-		arg.Phone,
-	)
+	row := db.QueryRow(ctx, signUp, arg.Username, arg.Password)
 	var i User
 	err := row.Scan(
 		&i.ID,

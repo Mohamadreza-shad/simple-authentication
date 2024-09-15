@@ -45,8 +45,6 @@ type Service struct {
 type SignUpParams struct {
 	Username     string `json:"username" validate:"required"`
 	Password     string `json:"password" validate:"required"`
-	NationalCode string `json:"nationalCode" validate:"required,len=10"`
-	Phone        string `json:"phone" validate:"required,len=11"`
 }
 
 type SignUpResponse struct {
@@ -91,8 +89,6 @@ func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpRespon
 		repository.SignUpParams{
 			Username:     params.Username,
 			Password:     string(hashedPassword),
-			NationalCode: params.NationalCode,
-			Phone:        params.Phone,
 		})
 	if err != nil {
 		return SignUpResponse{}, ErrSomethingWentWrong

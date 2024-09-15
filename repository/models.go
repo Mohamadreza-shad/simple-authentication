@@ -12,8 +12,8 @@ type User struct {
 	ID           int64
 	Username     string
 	Password     string
-	NationalCode string
-	Phone        string
+	NationalCode pgtype.Text
+	Phone        pgtype.Text
 	Email        pgtype.Text
 	IsActive     bool
 	CreatedAt    pgtype.Timestamp

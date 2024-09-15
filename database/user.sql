@@ -1,11 +1,9 @@
 -- name: SignUp :one
 INSERT INTO users(
 username,
-password,
-national_code,
-phone
+password
 ) VALUES(
-    $1,$2,$3,$4
+    $1,$2
 )
 RETURNING *;
 

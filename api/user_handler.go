@@ -60,6 +60,20 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 	}
 	params.UserId = userId
 	err = h.userService.UpdateUserProfile(c.Request.Context(), params)
+	if err != nil && errors.Is(err, user.ErrInvalidNationalCode) {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusBadRequest,
+			user.ErrInvalidNationalCode.Error())
+		return
+	}
+	if err != nil && errors.Is(err, user.ErrInvalidPhone) {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusBadRequest,
+			user.ErrInvalidPhone.Error())
+		return
+	}
 	if err != nil && errors.Is(err, user.ErrUserNotFound) {
 		MakeErrorResponseWithCode(
 			c.Writer,

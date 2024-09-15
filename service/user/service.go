@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/Mohamadreza-shad/simple-authentication/client"
 	"github.com/Mohamadreza-shad/simple-authentication/logger"
@@ -13,8 +14,10 @@ import (
 )
 
 var (
-	ErrSomethingWentWrong = errors.New("something went wrong")
-	ErrUserNotFound       = errors.New("user not found")
+	ErrSomethingWentWrong  = errors.New("something went wrong")
+	ErrUserNotFound        = errors.New("user not found")
+	ErrInvalidNationalCode = errors.New("invalid national code")
+	ErrInvalidPhone        = errors.New("invalid Phone")
 )
 
 type Service struct {
@@ -56,8 +59,8 @@ func (s *Service) UserById(ctx context.Context, params UserByIdParams) (User, er
 	return User{
 		Id:           fetchedUser.ID,
 		Name:         fetchedUser.Username,
-		NationalCode: fetchedUser.NationalCode,
-		Phone:        fetchedUser.Phone,
+		NationalCode: fetchedUser.NationalCode.String,
+		Phone:        fetchedUser.Phone.String,
 		IsActive:     fetchedUser.IsActive,
 		CreatedAt:    fetchedUser.CreatedAt.Time.Unix(),
 		UpdatedAt:    fetchedUser.CreatedAt.Time.Unix(),
@@ -65,6 +68,12 @@ func (s *Service) UserById(ctx context.Context, params UserByIdParams) (User, er
 }
 
 func (s *Service) UpdateUserProfile(ctx context.Context, params UpdateUserProfileParams) error {
+	if !strings.EqualFold(params.NationalCode, "") && len(params.NationalCode) != int(10) {
+		return ErrInvalidNationalCode
+	}
+	if !strings.EqualFold(params.Phone, "") && len(params.Phone) != int(11) {
+		return ErrInvalidPhone
+	}
 	_, err := s.repo.UserByID(ctx, s.db, params.UserId)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return ErrSomethingWentWrong
