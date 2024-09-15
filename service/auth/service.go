@@ -1,6 +1,5 @@
 package auth
 
-
 import (
 	"context"
 	"errors"
@@ -12,6 +11,7 @@ import (
 	"github.com/Mohamadreza-shad/simple-authentication/config"
 	"github.com/Mohamadreza-shad/simple-authentication/logger"
 	"github.com/Mohamadreza-shad/simple-authentication/repository"
+	"github.com/Mohamadreza-shad/simple-authentication/service/user"
 	jwtLib "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -43,8 +43,8 @@ type Service struct {
 }
 
 type SignUpParams struct {
-	Username     string `json:"username" validate:"required"`
-	Password     string `json:"password" validate:"required"`
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"`
 }
 
 type SignUpResponse struct {
@@ -68,6 +68,13 @@ type LogOutParams struct {
 	RefreshToken string `json:"refreshToken" validate:"required"`
 }
 
+type UpdatePasswordParams struct {
+	UserId      int64  `json:"-"`
+	OldPassword string `json:"oldPassword" validate:"required"`
+	NewPassword string `json:"newPassword" validate:"required"`
+	AccessToken string `json:"-"`
+}
+
 func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpResponse, error) {
 	_, err := s.repo.UserByName(ctx, s.db, params.Username)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -87,8 +94,8 @@ func (s *Service) SignUp(ctx context.Context, params SignUpParams) (SignUpRespon
 		ctx,
 		s.db,
 		repository.SignUpParams{
-			Username:     params.Username,
-			Password:     string(hashedPassword),
+			Username: params.Username,
+			Password: string(hashedPassword),
 		})
 	if err != nil {
 		return SignUpResponse{}, ErrSomethingWentWrong
@@ -274,6 +281,54 @@ func (s *Service) IsAccessTokenValid(ctx context.Context, signedToken string) (*
 		return nil, ErrInvalidOrExpiredToken
 	}
 	return token, nil
+}
+
+func (s *Service) UpdatePassword(ctx context.Context, params UpdatePasswordParams) error {
+	fetchedUser, err := s.repo.UserByID(ctx, s.db, params.UserId)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return ErrSomethingWentWrong
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return user.ErrUserNotFound
+	}
+	err = bcrypt.CompareHashAndPassword(
+		[]byte(fetchedUser.Password),
+		[]byte(params.OldPassword),
+	)
+	if err != nil {
+		return user.ErrWrongPassword
+	}
+	hashedPassword, err := bcrypt.GenerateFromPassword(
+		[]byte(params.NewPassword), 
+		bcrypt.DefaultCost,
+	)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	err = s.repo.UpdatePassword(
+		ctx,
+		s.db,
+		repository.UpdatePasswordParams{
+			ID:       params.UserId,
+			Password: string(hashedPassword),
+		})
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	redisKey := fmt.Sprintf("userId:%d", params.UserId)
+	err = s.redisClient.Del(ctx, redisKey).Err()
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	claims, err := TokenClaims(ctx, params.AccessToken)
+	if err != nil {
+		return ErrInvalidOrExpiredTokenPleaseSignInAgain
+	}
+	err = s.BlacklistToken(claims.ID)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	return nil
 }
 
 func TokenClaims(ctx context.Context, signedToken string) (*jwtLib.RegisteredClaims, error) {

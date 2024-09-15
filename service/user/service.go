@@ -20,6 +20,7 @@ var (
 	ErrInvalidPhone           = errors.New("invalid Phone")
 	ErrUsernameIsAlreadyTaken = errors.New("username is already taken")
 	ErrUsernameCannotBeEmpty  = errors.New("username cannot be empty")
+	ErrWrongPassword          = errors.New("wrong password")
 )
 
 type Service struct {
@@ -54,6 +55,8 @@ type UpdateUsernameParams struct {
 	UserId   int64  `json:"-"`
 	Username string `json:"username" validate:"required"`
 }
+
+
 
 func (s *Service) UserById(ctx context.Context, params UserByIdParams) (User, error) {
 	fetchedUser, err := s.repo.UserByID(ctx, s.db, params.Id)

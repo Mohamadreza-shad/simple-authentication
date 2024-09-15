@@ -43,6 +43,23 @@ func (q *Queries) SignUp(ctx context.Context, db DBTX, arg SignUpParams) (User, 
 	return i, err
 }
 
+const updatePassword = `-- name: UpdatePassword :exec
+UPDATE users
+SET 
+    password = $2
+WHERE id = $1
+`
+
+type UpdatePasswordParams struct {
+	ID       int64
+	Password string
+}
+
+func (q *Queries) UpdatePassword(ctx context.Context, db DBTX, arg UpdatePasswordParams) error {
+	_, err := db.Exec(ctx, updatePassword, arg.ID, arg.Password)
+	return err
+}
+
 const updateUserProfile = `-- name: UpdateUserProfile :exec
 UPDATE users
 SET 

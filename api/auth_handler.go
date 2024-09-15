@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Mohamadreza-shad/simple-authentication/service/auth"
+	"github.com/Mohamadreza-shad/simple-authentication/service/user"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
@@ -155,6 +156,65 @@ func (h *AuthHandler) LogOut(c *gin.Context) {
 		return
 	}
 	MakeSuccessResponse(c.Writer, nil, "use logged out successfully")
+}
+
+func (h *AuthHandler) UpdatePassword(c *gin.Context) {
+	userId, isExist := readUserIDFromContext(c)
+	if !isExist {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusUnauthorized,
+			"Invalid or expired token")
+		return
+	}
+	accessToken := c.GetHeader("Authorization")
+	params := auth.UpdatePasswordParams{}
+	err := c.BindJSON(&params)
+	if err != nil {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusBadRequest,
+			"Bad Request: "+err.Error(),
+		)
+		return
+	}
+	err = h.validator.Struct(params)
+	if err != nil {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusBadRequest,
+			"invalid request"+err.Error())
+		return
+	}
+	params.UserId = userId
+	params.AccessToken = accessToken
+	err = h.authService.UpdatePassword(c.Request.Context(), params)
+	if err != nil && errors.Is(err, user.ErrUserNotFound) {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusNotFound,
+			err.Error())
+		return
+	}
+	if err != nil && errors.Is(err, user.ErrWrongPassword) {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusForbidden,
+			err.Error())
+		return
+	}
+	if err != nil && errors.Is(err, auth.ErrInvalidOrExpiredTokenPleaseSignInAgain) {
+		MakeErrorResponseWithCode(
+			c.Writer,
+			http.StatusUnauthorized,
+			err.Error())
+		return
+	}
+	if err != nil {
+		MakeErrorResponseWithoutCode(c.Writer, err)
+		return
+	}
+	MakeSuccessResponse(c.Writer, nil, "password updated successfully")
 }
 
 func NewAuthHandler(

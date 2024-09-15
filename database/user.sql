@@ -26,3 +26,9 @@ UPDATE users
 SET 
     username = $2
 WHERE id = $1;
+
+-- name: UpdatePassword :exec
+UPDATE users
+SET 
+    password = $2
+WHERE id = $1;

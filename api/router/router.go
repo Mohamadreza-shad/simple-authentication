@@ -49,6 +49,7 @@ func New(
 	securedV1.GET("/user", userHandler.UserById)
 	securedV1.PUT("/user/update-profile", userHandler.UpdateUserProfile)
 	securedV1.PUT("/user/update-username", userHandler.UpdateUsername)
+	securedV1.PUT("/user/update-password", authHandler.UpdatePassword)
 
 	return &Router{
 		Handler: r,
