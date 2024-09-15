@@ -21,6 +21,7 @@ type Config struct {
 	Postgres Postgres
 	Secret   Secret
 	Redis    Redis
+	Server   Server
 }
 
 var cfg *Config = &Config{}
