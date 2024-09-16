@@ -3,7 +3,6 @@ package router
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/Mohamadreza-shad/simple-authentication/api"
 	"github.com/Mohamadreza-shad/simple-authentication/api/middleware"
@@ -45,11 +44,10 @@ func New(
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"PUT", "POST", "GET", "OPTIONS"}, 
-		AllowHeaders:     []string{"Authorization", "Content-Type", "Accept"},
+		AllowMethods:     []string{http.MethodPut, http.MethodPost, http.MethodGet, http.MethodDelete, http.MethodOptions},
+		AllowHeaders:     []string{middleware.Authorization, "Content-Type", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true, 
-		MaxAge:           12 * time.Hour,
+		AllowCredentials: true,
 	}))
 	r.Use(globalRecover(logger))
 	r.NoRoute(func(c *gin.Context) {

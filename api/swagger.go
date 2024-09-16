@@ -11,7 +11,7 @@ import (
 )
 
 func InitialSwagger() {
-	docs.SwaggerInfo.Schemes = []string{"http"}
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 	r := gin.Default()
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	go http.ListenAndServe(config.SwaggerUrl(), r)
