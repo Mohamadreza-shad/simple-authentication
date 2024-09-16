@@ -5,5 +5,9 @@ type Swagger struct {
 }
 
 func SwaggerUrl() string {
+	if cfg.Swagger.URL == "" {
+		return "http://localhost:3000/"
+		
+	}
 	return cfg.Swagger.URL
 }

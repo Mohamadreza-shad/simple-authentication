@@ -3,9 +3,11 @@ package router
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/Mohamadreza-shad/simple-authentication/api"
 	"github.com/Mohamadreza-shad/simple-authentication/api/middleware"
+	"github.com/Mohamadreza-shad/simple-authentication/docs"
 	"github.com/Mohamadreza-shad/simple-authentication/logger"
 	"github.com/Mohamadreza-shad/simple-authentication/service/auth"
 	"github.com/gin-contrib/cors"
@@ -33,8 +35,22 @@ func New(
 	logger *logger.Logger,
 ) *Router {
 	gin.SetMode(gin.ReleaseMode)
+
+	docs.SwaggerInfo.Title = "auth-service"
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Description = "Auth Service API documentation"
+	docs.SwaggerInfo.BasePath = ""
+	docs.SwaggerInfo.Host = "localhost:8080"
+
 	r := gin.Default()
-	r.Use(cors.Default())
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"PUT", "POST", "GET", "OPTIONS"}, 
+		AllowHeaders:     []string{"Authorization", "Content-Type", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true, 
+		MaxAge:           12 * time.Hour,
+	}))
 	r.Use(globalRecover(logger))
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(

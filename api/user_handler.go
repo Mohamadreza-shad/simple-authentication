@@ -25,7 +25,7 @@ type UserHandler struct {
 // @Success		 200	{object}	ResponseSuccess{data=user.User}
 // @Failure		 404	{object}	ResponseFailure
 // @Failure		 500	{object}	ResponseFailure
-// @Router		 / [get]
+// @Router		/api/v1/user [get]
 func (h *UserHandler) UserById(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {
@@ -65,7 +65,7 @@ func (h *UserHandler) UserById(c *gin.Context) {
 // @Failure		 403	{object}	ResponseFailure
 // @Failure		 400	{object}	ResponseFailure
 // @Failure		 500	{object}	ResponseFailure
-// @Router		 /update-profile [put]
+// @Router		/api/v1/user/update-profile [put]
 func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {
@@ -127,7 +127,7 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 // @Failure		 403	{object}	ResponseFailure
 // @Failure		 400	{object}	ResponseFailure
 // @Failure		 500	{object}	ResponseFailure
-// @Router		 /update-username [put]
+// @Router		 /api/v1/user/update-username [put]
 func (h *UserHandler) UpdateUsername(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {

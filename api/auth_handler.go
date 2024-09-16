@@ -222,7 +222,7 @@ func (h *AuthHandler) LogOut(c *gin.Context) {
 // @Failure		 403	{object}	ResponseFailure
 // @Failure		 404	{object}	ResponseFailure
 // @Failure		 500	{object}	ResponseFailure
-// @Router		 /api/user/update-password [put]
+// @Router		 /api/v1/user/update-password [put]
 func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {

@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 
-
 	"github.com/Mohamadreza-shad/simple-authentication/config"
 	"github.com/Mohamadreza-shad/simple-authentication/docs"
 	"github.com/gin-gonic/gin"
@@ -12,9 +11,8 @@ import (
 )
 
 func InitialSwagger() {
-	docs.SwaggerInfo.Schemes = []string{"https", "http"}
+	docs.SwaggerInfo.Schemes = []string{"http"}
 	r := gin.Default()
-	url := ginSwagger.URL("./swagger/doc.json")
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	go http.ListenAndServe(config.SwaggerUrl(), r)
 }
