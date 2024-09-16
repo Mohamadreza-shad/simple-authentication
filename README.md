@@ -55,3 +55,7 @@ Description: Update user profile details (e.g., username, phone).
 **#Authentication Middleware#**
 The /api/v1 routes are protected by the AuthMiddleware, which verifies the access token.
 If the token is invalid, expired, or blacklisted, the request will be rejected with an Unauthorized response.
+
+
+**#Swagger Url#**
+http://localhost:3000/swagger/index.html
