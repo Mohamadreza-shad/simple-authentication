@@ -1,0 +1,415 @@
+definitions:
+  api.ErrorCode:
+    properties:
+      code:
+        example: 404
+        type: integer
+      message:
+        example: item not find
+        type: string
+    type: object
+  api.ResponseFailure:
+    properties:
+      error:
+        $ref: '#/definitions/api.ErrorCode'
+      success:
+        example: false
+        type: boolean
+    type: object
+  api.ResponseSuccess:
+    properties:
+      data: {}
+      message:
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  auth.LogOutParams:
+    properties:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
+      userId:
+        type: string
+    required:
+    - accessToken
+    - refreshToken
+    - userId
+    type: object
+  auth.RefreshTokenParams:
+    properties:
+      refreshToken:
+        type: string
+      userId:
+        type: string
+    required:
+    - refreshToken
+    - userId
+    type: object
+  auth.SignInParams:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  auth.SignUpParams:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  auth.SignUpResponse:
+    properties:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
+    type: object
+  auth.UpdatePasswordParams:
+    properties:
+      newPassword:
+        type: string
+      oldPassword:
+        type: string
+    required:
+    - newPassword
+    - oldPassword
+    type: object
+  user.UpdateUserProfileParams:
+    properties:
+      email:
+        type: string
+      nationalCode:
+        type: string
+      phone:
+        type: string
+    type: object
+  user.UpdateUsernameParams:
+    properties:
+      username:
+        type: string
+    required:
+    - username
+    type: object
+  user.User:
+    properties:
+      createdAt:
+        type: integer
+      id:
+        type: integer
+      isActive:
+        type: boolean
+      nationalCode:
+        type: string
+      phone:
+        type: string
+      updatedAt:
+        type: integer
+      username:
+        type: string
+    type: object
+info:
+  contact: {}
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://auth-service/terms/
+paths:
+  /:
+    get:
+      consumes:
+      - application/json
+      description: fetch user profile
+      operationId: User-Profile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.ResponseSuccess'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.User'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      security:
+      - ApiKeyAuth: []
+      summary: fetch user profile
+      tags:
+      - Auth
+  /api/user/logout:
+    post:
+      consumes:
+      - application/json
+      description: should log out user
+      operationId: User-LogOut
+      parameters:
+      - description: LogOut-Params
+        in: body
+        name: params
+        schema:
+          $ref: '#/definitions/auth.LogOutParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ResponseSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      summary: should log out user
+      tags:
+      - Auth
+  /api/user/refresh-token:
+    post:
+      consumes:
+      - application/json
+      description: should refresh access token
+      operationId: User-Refresh-Token
+      parameters:
+      - description: RefreshToken-Params
+        in: body
+        name: params
+        schema:
+          $ref: '#/definitions/auth.RefreshTokenParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.ResponseSuccess'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.SignUpResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      summary: should refresh access token
+      tags:
+      - Auth
+  /api/user/signin:
+    post:
+      consumes:
+      - application/json
+      description: should sign in user
+      operationId: User-SignIn
+      parameters:
+      - description: SignIn-Params
+        in: body
+        name: params
+        schema:
+          $ref: '#/definitions/auth.SignInParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.ResponseSuccess'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.SignUpResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      summary: should sign in user
+      tags:
+      - Auth
+  /api/user/signup:
+    post:
+      consumes:
+      - application/json
+      description: should sign up user
+      operationId: User-SignUp
+      parameters:
+      - description: SignUp-Params
+        in: body
+        name: params
+        schema:
+          $ref: '#/definitions/auth.SignUpParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.ResponseSuccess'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.SignUpResponse'
+              type: object
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      summary: should sign up user
+      tags:
+      - Auth
+  /api/user/update-password:
+    put:
+      consumes:
+      - application/json
+      description: should update user password
+      operationId: User-Update-Password
+      parameters:
+      - description: Update-Password-Params
+        in: body
+        name: params
+        schema:
+          $ref: '#/definitions/auth.UpdatePasswordParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ResponseSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      security:
+      - ApiKeyAuth: []
+      summary: should update user password
+      tags:
+      - Auth
+  /update-profile:
+    put:
+      consumes:
+      - application/json
+      description: update user profile
+      operationId: User-Update-Profile
+      parameters:
+      - description: Update-User-Profile-Params
+        in: body
+        name: params
+        schema:
+          $ref: '#/definitions/user.UpdateUserProfileParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ResponseSuccess'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      security:
+      - ApiKeyAuth: []
+      summary: update user profile
+      tags:
+      - Auth
+  /update-username:
+    put:
+      consumes:
+      - application/json
+      description: update username
+      operationId: User-Update-Username
+      parameters:
+      - description: Update-Username-Params
+        in: body
+        name: params
+        schema:
+          $ref: '#/definitions/user.UpdateUsernameParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ResponseSuccess'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ResponseFailure'
+      security:
+      - ApiKeyAuth: []
+      summary: update username
+      tags:
+      - Auth
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
