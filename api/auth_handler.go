@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Mohamadreza-shad/simple-authentication/api/middleware"
 	"github.com/Mohamadreza-shad/simple-authentication/service/auth"
 	"github.com/Mohamadreza-shad/simple-authentication/service/user"
 	"github.com/gin-gonic/gin"
@@ -167,7 +168,7 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 			"Invalid or expired token")
 		return
 	}
-	accessToken := c.GetHeader("Authorization")
+	accessToken := middleware.ExtractTokenFromRequest(c.Request)
 	params := auth.UpdatePasswordParams{}
 	err := c.BindJSON(&params)
 	if err != nil {

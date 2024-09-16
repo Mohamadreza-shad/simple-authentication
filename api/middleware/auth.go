@@ -18,7 +18,7 @@ const (
 
 func AuthMiddleware(s *auth.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		signedAccessToken := extractTokenFromRequest(c.Request)
+		signedAccessToken := ExtractTokenFromRequest(c.Request)
 		if strings.EqualFold(signedAccessToken, "") {
 			c.AbortWithStatusJSON(
 				http.StatusBadRequest,
@@ -76,7 +76,7 @@ func AuthMiddleware(s *auth.Service) gin.HandlerFunc {
 	}
 }
 
-func extractTokenFromRequest(r *http.Request) (token string) {
+func ExtractTokenFromRequest(r *http.Request) (token string) {
 	token = r.Header.Get(Authorization)
 	token = strings.Trim(token, `"`)
 	if strings.Contains(token, Bearing) {
