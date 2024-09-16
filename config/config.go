@@ -22,6 +22,7 @@ type Config struct {
 	Secret   Secret
 	Redis    Redis
 	Server   Server
+	Swagger  Swagger
 }
 
 var cfg *Config = &Config{}

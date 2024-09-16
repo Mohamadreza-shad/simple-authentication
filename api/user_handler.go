@@ -14,6 +14,18 @@ type UserHandler struct {
 	validator   *validator.Validate
 }
 
+// This endpoint fetch user profile
+// @Summary		 fetch user profile
+// @Description	 fetch user profile
+// @Tags		 Auth
+// @ID			 User-Profile
+// @Accept		 json
+// @Produce		 json
+// @Security	 ApiKeyAuth
+// @Success		 200	{object}	ResponseSuccess{data=user.User}
+// @Failure		 404	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 / [get]
 func (h *UserHandler) UserById(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {
@@ -40,6 +52,20 @@ func (h *UserHandler) UserById(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, fetchedUser, "user fetched successfully")
 }
 
+// This endpoint update user profile
+// @Summary		 update user profile
+// @Description	 update user profile
+// @Tags		 Auth
+// @ID			 User-Update-Profile
+// @Accept		 json
+// @Produce		 json
+// @Security	 ApiKeyAuth
+// @Param		 params body user.UpdateUserProfileParams false "Update-User-Profile-Params"
+// @Success		 200	{object}	ResponseSuccess
+// @Failure		 403	{object}	ResponseFailure
+// @Failure		 400	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 /update-profile [put]
 func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {
@@ -88,6 +114,20 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, nil, "user profile updated successfully")
 }
 
+// This endpoint update username
+// @Summary		 update username
+// @Description	 update username
+// @Tags		 Auth
+// @ID			 User-Update-Username
+// @Accept		 json
+// @Produce		 json
+// @Security	 ApiKeyAuth
+// @Param		 params body user.UpdateUsernameParams false "Update-Username-Params"
+// @Success		 200	{object}	ResponseSuccess
+// @Failure		 403	{object}	ResponseFailure
+// @Failure		 400	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 /update-username [put]
 func (h *UserHandler) UpdateUsername(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {
@@ -128,6 +168,7 @@ func (h *UserHandler) UpdateUsername(c *gin.Context) {
 	}
 	MakeSuccessResponse(c.Writer, nil, "username has been updated successfully")
 }
+
 func NewUserHandler(
 	userService *user.Service,
 	validator *validator.Validate,

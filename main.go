@@ -47,6 +47,7 @@ func main() {
 	authHandler := api.NewAuthHandler(authService,validator)
 	userHandler := api.NewUserHandler(userService,validator)
 
+	api.InitialSwagger()
 	router := router.New(authHandler,userHandler,authService,logger)
 	httpServer := &http.Server{
 		Addr: config.ServerHttpAddress(),

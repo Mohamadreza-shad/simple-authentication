@@ -16,6 +16,18 @@ type AuthHandler struct {
 	validator   *validator.Validate
 }
 
+// This endpoint should sign up user
+// @Summary		 should sign up user
+// @Description	 should sign up user
+// @Tags		 Auth
+// @ID			 User-SignUp
+// @Accept		 json
+// @Produce		 json
+// @Param		 params body auth.SignUpParams false "SignUp-Params"
+// @Success		 200	{object}	ResponseSuccess{data=auth.SignUpResponse}
+// @Failure		 409	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 /api/user/signup [post]
 func (h *AuthHandler) SignUp(c *gin.Context) {
 	params := auth.SignUpParams{}
 	err := c.BindJSON(&params)
@@ -50,6 +62,19 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, res, "user created successfully")
 }
 
+// This endpoint should sign in user
+// @Summary		 should sign in user
+// @Description	 should sign in user
+// @Tags		 Auth
+// @ID			 User-SignIn
+// @Accept		 json
+// @Produce		 json
+// @Param		 params body auth.SignInParams false "SignIn-Params"
+// @Success		 200	{object}	ResponseSuccess{data=auth.SignUpResponse}
+// @Failure		 404	{object}	ResponseFailure
+// @Failure		 401	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 /api/user/signin [post]
 func (h *AuthHandler) SignIn(c *gin.Context) {
 	params := auth.SignInParams{}
 	err := c.BindJSON(&params)
@@ -91,6 +116,18 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, res, "user signed in successfully")
 }
 
+// This endpoint should refresh access token
+// @Summary		 should refresh access token
+// @Description	 should refresh access token
+// @Tags		 Auth
+// @ID			 User-Refresh-Token
+// @Accept		 json
+// @Produce		 json
+// @Param		 params body auth.RefreshTokenParams false "RefreshToken-Params"
+// @Success		 200	{object}	ResponseSuccess{data=auth.SignUpResponse}
+// @Failure		 401	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 /api/user/refresh-token [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	params := auth.RefreshTokenParams{}
 	err := c.BindJSON(&params)
@@ -125,6 +162,18 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, res, "Access toke generated successfully")
 }
 
+// This endpoint should log out user
+// @Summary		 should log out user
+// @Description	 should log out user
+// @Tags		 Auth
+// @ID			 User-LogOut
+// @Accept		 json
+// @Produce		 json
+// @Param		 params body auth.LogOutParams false "LogOut-Params"
+// @Success		 200	{object}	ResponseSuccess
+// @Failure		 401	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 /api/user/logout [post]
 func (h *AuthHandler) LogOut(c *gin.Context) {
 	params := auth.LogOutParams{}
 	err := c.BindJSON(&params)
@@ -159,6 +208,21 @@ func (h *AuthHandler) LogOut(c *gin.Context) {
 	MakeSuccessResponse(c.Writer, nil, "use logged out successfully")
 }
 
+// This endpoint should update user password
+// @Summary		 should update user password
+// @Description	 should update user password
+// @Tags		 Auth
+// @ID			 User-Update-Password
+// @Accept		 json
+// @Produce		 json
+// @Security	 ApiKeyAuth
+// @Param		 params body auth.UpdatePasswordParams false "Update-Password-Params"
+// @Success		 200	{object}	ResponseSuccess
+// @Failure		 401	{object}	ResponseFailure
+// @Failure		 403	{object}	ResponseFailure
+// @Failure		 404	{object}	ResponseFailure
+// @Failure		 500	{object}	ResponseFailure
+// @Router		 /api/user/update-password [put]
 func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 	userId, isExist := readUserIDFromContext(c)
 	if !isExist {

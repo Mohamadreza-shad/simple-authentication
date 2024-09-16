@@ -17,6 +17,15 @@ type Router struct {
 	Handler *gin.Engine
 }
 
+// @termsOfService				http://auth-service/terms/
+// @license.name				Apache 2.0
+// @license.url					http://www.apache.org/licenses/LICENSE-2.0.html
+// @securityDefinitions.apikey  ApiKeyAuth
+// @in 							header
+// @name 						Authorization
+// @query.collection.format 	multi
+// @externalDocs.description  	OpenAPI
+// @externalDocs.url          	https://swagger.io/resources/open-api/
 func New(
 	authHandler *api.AuthHandler,
 	userHandler *api.UserHandler,
@@ -44,12 +53,12 @@ func New(
 	r.POST("/api/user/refresh-token", authHandler.RefreshToken)
 	r.POST("/api/user/logout", authHandler.LogOut)
 
-	securedV1 := r.Group("/api/v1")
+	securedV1 := r.Group("/api/v1/user")
 	securedV1.Use(middleware.AuthMiddleware(authService))
-	securedV1.GET("/user", userHandler.UserById)
-	securedV1.PUT("/user/update-profile", userHandler.UpdateUserProfile)
-	securedV1.PUT("/user/update-username", userHandler.UpdateUsername)
-	securedV1.PUT("/user/update-password", authHandler.UpdatePassword)
+	securedV1.GET("/", userHandler.UserById)
+	securedV1.PUT("/update-profile", userHandler.UpdateUserProfile)
+	securedV1.PUT("/update-username", userHandler.UpdateUsername)
+	securedV1.PUT("/update-password", authHandler.UpdatePassword)
 
 	return &Router{
 		Handler: r,
