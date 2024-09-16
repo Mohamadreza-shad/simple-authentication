@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/Mohamadreza-shad/simple-authentication/api"
+	"github.com/Mohamadreza-shad/simple-authentication/api/middleware"
 	"github.com/Mohamadreza-shad/simple-authentication/config"
 	"github.com/Mohamadreza-shad/simple-authentication/repository"
 	"github.com/Mohamadreza-shad/simple-authentication/service/auth"
+	"github.com/Mohamadreza-shad/simple-authentication/service/user"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -29,6 +31,11 @@ type ResponseSuccess struct {
 	Success bool                `json:"success" example:"true"`
 	Message string              `json:"message,omitempty"`
 	Data    auth.SignUpResponse `json:"data,omitempty"`
+}
+
+type UpdatePasswordResponseSuccess struct {
+	Success bool   `json:"success" example:"true"`
+	Message string `json:"message,omitempty"`
 }
 
 func Test_UserCannot_SignUp_UsernameIsAlreadyTaken(t *testing.T) {
@@ -52,8 +59,8 @@ func Test_UserCannot_SignUp_UsernameIsAlreadyTaken(t *testing.T) {
 	r.POST("api/user/signup", authHandler.SignUp)
 
 	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
-		Username:     "test-user",
-		Password:     "p@ssW0rd",
+		Username: "test-user",
+		Password: "p@ssW0rd",
 	})
 	assert.Nil(err)
 
@@ -61,8 +68,8 @@ func Test_UserCannot_SignUp_UsernameIsAlreadyTaken(t *testing.T) {
 	defer server.Close()
 
 	paramsInJson, err := json.Marshal(auth.SignUpParams{
-		Username:     "test-user",
-		Password:     "p@ssW0rd",
+		Username: "test-user",
+		Password: "p@ssW0rd",
 	})
 	assert.Nil(err)
 
@@ -115,8 +122,8 @@ func Test_User_SignUp_Successfully(t *testing.T) {
 	defer server.Close()
 
 	paramsInJson, err := json.Marshal(auth.SignUpParams{
-		Username:     "test-user",
-		Password:     "p@ssW0rd",
+		Username: "test-user",
+		Password: "p@ssW0rd",
 	})
 	assert.Nil(err)
 
@@ -244,8 +251,8 @@ func Test_User_SingIn_ErrUsernameOrPasswordIsIncorrect(t *testing.T) {
 	authHandler := api.NewAuthHandler(authService, validator)
 
 	_, err = repo.SignUp(ctx, db, repository.SignUpParams{
-		Username:     "test-user",
-		Password:     "p@ssW0rd",
+		Username: "test-user",
+		Password: "p@ssW0rd",
 	})
 	assert.Nil(err)
 
@@ -307,8 +314,8 @@ func Test_User_SingIn_Successful(t *testing.T) {
 	)
 	assert.Nil(err)
 	createdUser, err := repo.SignUp(ctx, db, repository.SignUpParams{
-		Username:     "test-user",
-		Password:     string(hashedPassword),
+		Username: "test-user",
+		Password: string(hashedPassword),
 	})
 	assert.Nil(err)
 
@@ -897,6 +904,274 @@ func Test_User_LogOut_Successful(t *testing.T) {
 	assert.Equal(err, redis.Nil)
 
 	blacklistKey := fmt.Sprintf("blacklist:%s", jti)
+	blackListedAccessKey, err := redisClient.Get(ctx, blacklistKey).Bool()
+	assert.Nil(err)
+	assert.True(blackListedAccessKey)
+}
+
+func Test_User_UpdatePassword_UserNotFound(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	authService := auth.New(db, repo, redisClient, logger)
+	authHandler := api.NewAuthHandler(authService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signup", authHandler.SignUp)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(auth.SignUpParams{
+		Username: "test-user",
+		Password: "old-p@ssW0rd",
+	})
+	assert.Nil(err)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signup", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	signUpResponse := ResponseSuccess{}
+	err = json.Unmarshal(respInByte, &signUpResponse)
+	assert.Nil(err)
+
+	accessTokenFromServer := signUpResponse.Data.AccessToken
+
+	v1 := r.Group("/api/v1")
+	v1.Use(middleware.AuthMiddleware(authService))
+	v1.PUT("/user/update-password", authHandler.UpdatePassword)
+
+	params := auth.UpdatePasswordParams{
+		OldPassword: "old-p@ssW0rd",
+		NewPassword: "new-p@ssW0rd",
+	}
+	paramsInJson, err = json.Marshal(params)
+	assert.Nil(err)
+
+	req, err = http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("%s/api/v1/user/update-password", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Authorization", accessTokenFromServer)
+
+	assert.Nil(truncateDB())
+	// Act
+	resp, err = http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err = io.ReadAll(resp.Body)
+	assert.Nil(err)
+	userByIdResponse := api.ResponseFailure{}
+	err = json.Unmarshal(respInByte, &userByIdResponse)
+	assert.Nil(err)
+
+	// Assert
+	assert.False(userByIdResponse.Success)
+	assert.Equal(userByIdResponse.Error.Code, http.StatusNotFound)
+	assert.Equal(userByIdResponse.Error.Message, user.ErrUserNotFound.Error())
+}
+
+func Test_User_UpdatePassword_WrongOldPassword(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	authService := auth.New(db, repo, redisClient, logger)
+	authHandler := api.NewAuthHandler(authService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signup", authHandler.SignUp)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(auth.SignUpParams{
+		Username: "test-user",
+		Password: "old-p@ssW0rd",
+	})
+	assert.Nil(err)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signup", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	signUpResponse := ResponseSuccess{}
+	err = json.Unmarshal(respInByte, &signUpResponse)
+	assert.Nil(err)
+
+	accessTokenFromServer := signUpResponse.Data.AccessToken
+
+	v1 := r.Group("/api/v1")
+	v1.Use(middleware.AuthMiddleware(authService))
+	v1.PUT("/user/update-password", authHandler.UpdatePassword)
+
+	params := auth.UpdatePasswordParams{
+		OldPassword: "wrong-old-p@ssW0rd",
+		NewPassword: "new-p@ssW0rd",
+	}
+	paramsInJson, err = json.Marshal(params)
+	assert.Nil(err)
+
+	req, err = http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("%s/api/v1/user/update-password", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Authorization", accessTokenFromServer)
+
+	// Act
+	resp, err = http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err = io.ReadAll(resp.Body)
+	assert.Nil(err)
+	userByIdResponse := api.ResponseFailure{}
+	err = json.Unmarshal(respInByte, &userByIdResponse)
+	assert.Nil(err)
+
+	// Assert
+	assert.False(userByIdResponse.Success)
+	assert.Equal(userByIdResponse.Error.Code, http.StatusForbidden)
+	assert.Equal(userByIdResponse.Error.Message, user.ErrWrongPassword.Error())
+}
+
+func Test_User_UpdatePassword_Successful(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	assert := assert.New(t)
+	logger := getLogger()
+	validator := validator.New()
+	redisClient := getRedis()
+	err := redisClient.FlushAll(ctx).Err()
+	assert.Nil(err)
+	db := getDB()
+	err = truncateDB()
+	assert.Nil(err)
+	repo := repository.New()
+	authService := auth.New(db, repo, redisClient, logger)
+	authHandler := api.NewAuthHandler(authService, validator)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("api/user/signup", authHandler.SignUp)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	paramsInJson, err := json.Marshal(auth.SignUpParams{
+		Username: "test-user",
+		Password: "old-p@ssW0rd",
+	})
+	assert.Nil(err)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/api/user/signup", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err := io.ReadAll(resp.Body)
+	assert.Nil(err)
+	signUpResponse := ResponseSuccess{}
+	err = json.Unmarshal(respInByte, &signUpResponse)
+	assert.Nil(err)
+
+	accessTokenFromServer := signUpResponse.Data.AccessToken
+	claims,err := auth.TokenClaims(ctx,accessTokenFromServer)
+	assert.Nil(err)
+	
+
+	v1 := r.Group("/api/v1")
+	v1.Use(middleware.AuthMiddleware(authService))
+	v1.PUT("/user/update-password", authHandler.UpdatePassword)
+
+	params := auth.UpdatePasswordParams{
+		OldPassword: "old-p@ssW0rd",
+		NewPassword: "new-p@ssW0rd",
+	}
+	paramsInJson, err = json.Marshal(params)
+	assert.Nil(err)
+
+	req, err = http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("%s/api/v1/user/update-password", server.URL),
+		bytes.NewBuffer(paramsInJson),
+	)
+	assert.Nil(err)
+	req.Header.Set("Authorization", accessTokenFromServer)
+
+	// Act
+	resp, err = http.DefaultClient.Do(req)
+	assert.Nil(err)
+	defer resp.Body.Close()
+
+	respInByte, err = io.ReadAll(resp.Body)
+	assert.Nil(err)
+	userByIdResponse := UpdatePasswordResponseSuccess{}
+	err = json.Unmarshal(respInByte, &userByIdResponse)
+	assert.Nil(err)
+
+	// Assert
+	assert.True(userByIdResponse.Success)
+	assert.Equal(userByIdResponse.Message, "password updated successfully")
+
+	//check if refresh token is deleted from redis
+	redisKey := fmt.Sprintf("userId:%d", params.UserId)
+	err = redisClient.Get(ctx, redisKey).Err()
+	assert.Equal(err, redis.Nil)
+
+	blacklistKey := fmt.Sprintf("blacklist:%s", claims.ID)
 	blackListedAccessKey, err := redisClient.Get(ctx, blacklistKey).Bool()
 	assert.Nil(err)
 	assert.True(blackListedAccessKey)
